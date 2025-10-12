@@ -239,10 +239,10 @@ broadcast-relay/
 
 ## Ephemeral Events
 
-Ephemeral events (kinds 20000-29999) are handled specially:
+Ephemeral events (kinds 20000-29999) are handled the same as regular events:
 - **Processed for discovery**: Relay hints are extracted from ephemeral events
-- **NOT broadcasted**: Ephemeral events are meant for real-time delivery only and are not forwarded to other relays
-- This preserves bandwidth and respects the ephemeral nature of these events
+- **Broadcasted**: Forwarded to top N relays just like any other event
+- This relay doesn't store anything (including ephemeral events), but forwards everything for maximum reach
 
 ## Limitations
 

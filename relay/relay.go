@@ -126,9 +126,8 @@ func (r *Relay) handleEphemeralEvent(event *nostr.Event) {
 		log.Printf("Extracted %d relay URLs from ephemeral event %s (kind %d)", len(relays), event.ID, event.Kind)
 	}
 
-	// Do NOT broadcast ephemeral events to other relays
-	// Ephemeral events are meant for real-time delivery to connected clients only
-	log.Printf("Received ephemeral event %s (kind %d) - not broadcasting", event.ID, event.Kind)
+	// Broadcast ephemeral events just like any other event
+	r.broadcaster.Broadcast(event)
 }
 
 // Start starts the relay server
