@@ -92,10 +92,10 @@ func (b *Broadcaster) worker(id int) {
 			}
 			// Decrement total queued count
 			atomic.AddInt64(&b.totalQueued, -1)
-			
+
 			// Try to backfill from overflow
 			b.backfillChannel()
-			
+
 			// Broadcast the event
 			b.broadcastEvent(event)
 		}
@@ -153,7 +153,7 @@ func (b *Broadcaster) Broadcast(event *nostr.Event) {
 
 		b.overflowQueue = append(b.overflowQueue, event)
 		newTotal := atomic.AddInt64(&b.totalQueued, 1)
-		
+
 		// Track saturation
 		if len(b.overflowQueue) == 1 {
 			// First overflow, log warning
@@ -162,7 +162,7 @@ func (b *Broadcaster) Broadcast(event *nostr.Event) {
 			logging.Warn("Broadcaster: Channel saturated (%d/%d), using overflow queue",
 				len(b.eventQueue), b.channelCapacity)
 		}
-		
+
 		logging.Debug("Broadcaster: Event %s (kind %d) queued to overflow (overflow: %d, total: %d)",
 			event.ID, event.Kind, len(b.overflowQueue), newTotal)
 
@@ -299,6 +299,7 @@ func (b *Broadcaster) GetStats() map[string]interface{} {
 		"total_relays":  totalRelays,
 		"active_relays": len(topRelays),
 		"queue": map[string]interface{}{
+			"worker_count":        b.workerCount,
 			"channel_size":        channelSize,
 			"channel_capacity":    b.channelCapacity,
 			"channel_utilization": channelUtilization,

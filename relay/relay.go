@@ -132,6 +132,22 @@ func (r *Relay) Start() error {
 		fmt.Fprintf(w, "{\n")
 		fmt.Fprintf(w, "  \"total_relays\": %d,\n", stats["total_relays"])
 		fmt.Fprintf(w, "  \"active_relays\": %d,\n", stats["active_relays"])
+		
+		// Queue stats
+		queue := stats["queue"].(map[string]interface{})
+		fmt.Fprintf(w, "  \"queue\": {\n")
+		fmt.Fprintf(w, "    \"worker_count\": %d,\n", queue["worker_count"])
+		fmt.Fprintf(w, "    \"channel_size\": %d,\n", queue["channel_size"])
+		fmt.Fprintf(w, "    \"channel_capacity\": %d,\n", queue["channel_capacity"])
+		fmt.Fprintf(w, "    \"channel_utilization\": %.2f,\n", queue["channel_utilization"])
+		fmt.Fprintf(w, "    \"overflow_size\": %d,\n", queue["overflow_size"])
+		fmt.Fprintf(w, "    \"total_queued\": %d,\n", queue["total_queued"])
+		fmt.Fprintf(w, "    \"peak_size\": %d,\n", queue["peak_size"])
+		fmt.Fprintf(w, "    \"saturation_count\": %d,\n", queue["saturation_count"])
+		fmt.Fprintf(w, "    \"is_saturated\": %v,\n", queue["is_saturated"])
+		fmt.Fprintf(w, "    \"last_saturation\": \"%v\"\n", queue["last_saturation"])
+		fmt.Fprintf(w, "  },\n")
+		
 		fmt.Fprintf(w, "  \"top_relays\": [\n")
 
 		topRelays := stats["top_relays"].([]map[string]interface{})
