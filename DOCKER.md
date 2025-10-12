@@ -84,22 +84,40 @@ cat tor-data/hostname
 
 Your relay will be accessible at: `ws://abcd1234efgh5678.onion:80`
 
-### Nginx Reverse Proxy (Optional)
+### Nginx Reverse Proxy (Optional - Host Installation)
 
-For clearnet access with proper WebSocket support.
+For clearnet access with proper WebSocket support. **Nginx runs on the host machine**, not in Docker.
 
-**Enable clearnet access**:
+The relay is exposed on `localhost:3334` from the Docker container, and nginx proxies to it.
+
+**Setup nginx on host**:
 ```bash
-# Copy example config
-cp nginx.conf.example nginx.conf
+# Install nginx (if not already installed)
+sudo apt-get install nginx  # Ubuntu/Debian
+# or
+sudo yum install nginx      # CentOS/RHEL
 
-# Start with clearnet profile
-docker-compose -f docker-compose.prod.yml --profile clearnet up -d
+# Copy the example config
+sudo cp nginx.conf.example /etc/nginx/sites-available/broadcast-relay
+
+# Edit to set your domain name
+sudo nano /etc/nginx/sites-available/broadcast-relay
+
+# Enable the site
+sudo ln -s /etc/nginx/sites-available/broadcast-relay /etc/nginx/sites-enabled/
+
+# Test configuration
+sudo nginx -t
+
+# Reload nginx
+sudo systemctl reload nginx
 ```
 
-**Access**: `ws://localhost:3334` (or set custom port with `CLEARNET_PORT`)
+**Access**: 
+- HTTP: `ws://your-domain.com`
+- HTTPS: Configure SSL (see commented section in nginx.conf.example)
 
-**Health Check**: Verifies nginx can proxy to `/stats` endpoint
+**Note**: The relay container exposes port 3334 only to localhost (127.0.0.1:3334)
 
 ### Autoheal Service
 
@@ -166,12 +184,13 @@ The relay runs as a non-root user (`relay:relay`, UID/GID 1000) inside the conta
 
 ### Health Checks
 
-All services have health checks configured:
+All Docker services have health checks configured:
 
 - **Relay**: Checks `/stats` endpoint every 30s
 - **Tor**: Verifies Tor process and hostname file every 30s  
-- **Nginx**: Checks proxy to `/stats` endpoint every 30s
 - **Autoheal**: Monitors all containers and auto-restarts unhealthy ones
+
+**Note**: Nginx runs on the host and is monitored by systemd
 
 ```bash
 # Check health status of all containers
@@ -305,34 +324,43 @@ docker exec broadcast-relay wget -qO- http://localhost:3334/stats
 ## Architecture
 
 ```
-┌─────────────────┐
-│   Tor Network   │
-│  (your.onion)   │
-└────────┬────────┘
-         │
-    ┌────▼─────┐  ◄────────────┐
-    │   Tor    │               │
-    │ Hidden   │  Health       │
-    │ Service  │  Monitored    │
-    └────┬─────┘               │    ┌──────────────┐
-         │                     │    │  Autoheal    │
-    ┌────▼─────┐  ◄────────────┤    │  Monitor     │
-    │  Nginx   │◄──┐           │    │  & Restart   │
-    │ (opt.)   │   │           │    └──────────────┘
-    └────┬─────┘   │           │
-         │         │           │
-    ┌────▼─────────▼─┐  ◄──────┘
-    │ Broadcast      │         ┌──────────────┐
-    │ Relay          │◄────────│   Clearnet   │
-    │ (port 3334)    │         │  (optional)  │
-    └────────────────┘         └──────────────┘
-         │
-         │ Broadcasts to
-         ▼
-    ┌──────────────┐
-    │ Nostr Relays │
-    │ (Top N + Man)│
-    └──────────────┘
+┌─────────────────────────────────────────────────────┐
+│                    HOST MACHINE                     │
+│                                                     │
+│  ┌──────────────┐                                  │
+│  │   Nginx      │◄─────────────┐                   │
+│  │ (optional)   │              │                   │
+│  └──────┬───────┘              │                   │
+│         │                  Clearnet                │
+│         │              (port 80/443)               │
+│         │                                          │
+│  ┌──────▼──────────────────────────────────────┐  │
+│  │         DOCKER CONTAINERS                   │  │
+│  │  ┌─────────────────────────────────┐        │  │
+│  │  │  Broadcast Relay                │ ◄──┐   │  │
+│  │  │  localhost:3334                 │    │   │  │
+│  │  └──────────┬──────────────────────┘    │   │  │
+│  │             │                            │   │  │
+│  │       ┌─────▼──────┐   ┌─────────────┐  │   │  │
+│  │       │    Tor     │   │  Autoheal   │──┘   │  │
+│  │       │  Hidden    │   │  Monitor &  │      │  │
+│  │       │  Service   │   │  Restart    │      │  │
+│  │       └─────┬──────┘   └─────────────┘      │  │
+│  │             │                                │  │
+│  └─────────────┼────────────────────────────────┘  │
+└────────────────┼───────────────────────────────────┘
+                 │
+           ┌─────▼──────┐
+           │Tor Network │
+           │(your.onion)│
+           └────────────┘
+                 │
+                 │ Broadcasts to
+                 ▼
+           ┌─────────────┐
+           │Nostr Relays │
+           │(Top N + Man)│
+           └─────────────┘
 ```
 
 ## See Also

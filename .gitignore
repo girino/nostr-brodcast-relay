@@ -48,6 +48,3 @@ hostname
 private_key
 hs_ed25519_public_key
 hs_ed25519_secret_key
-
-# Nginx config (may contain sensitive data)
-nginx.conf

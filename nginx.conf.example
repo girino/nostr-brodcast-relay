@@ -1,79 +1,113 @@
-# Nginx Configuration for Broadcast Relay
-# This proxies WebSocket connections and HTTP requests to the relay service
-# Copy this file to nginx.conf before starting with --profile clearnet
+# Nginx Site Configuration for Broadcast Relay
+# This configuration is for nginx running on the HOST machine (not in Docker)
+# The relay runs in Docker and is exposed on localhost:3334
+# 
+# Installation:
+# 1. Copy this file: sudo cp nginx.conf.example /etc/nginx/sites-available/broadcast-relay
+# 2. Create symlink: sudo ln -s /etc/nginx/sites-available/broadcast-relay /etc/nginx/sites-enabled/
+# 3. Test config: sudo nginx -t
+# 4. Reload nginx: sudo systemctl reload nginx
 
-events {
-    worker_connections 1024;
-    use epoll;
+# Upstream backend - the broadcast relay Docker container
+# Exposed on localhost:3334 from docker-compose
+upstream broadcast_relay {
+    server 127.0.0.1:3334;
+    keepalive 32;
 }
 
-http {
-    # Upstream backend - the broadcast relay service
-    upstream relay {
-        server relay:3334;
-        keepalive 32;
-    }
-
+# HTTP server block (port 80)
+server {
+    listen 80;
+    listen [::]:80;
+    
+    # Change to your domain name or use _ for default
+    server_name relay.example.com;
+    
     # Logging
-    access_log /dev/stdout;
-    error_log /dev/stderr warn;
+    access_log /var/log/nginx/broadcast-relay-access.log;
+    error_log /var/log/nginx/broadcast-relay-error.log warn;
 
-    # Basic settings
-    sendfile on;
-    tcp_nopush on;
-    tcp_nodelay on;
-    keepalive_timeout 65;
-    types_hash_max_size 2048;
+    # Increase buffer sizes for WebSocket
+    proxy_buffer_size 16k;
+    proxy_buffers 8 16k;
+    proxy_busy_buffers_size 32k;
 
-    # Gzip compression for HTTP responses
-    gzip on;
-    gzip_vary on;
-    gzip_types application/json text/plain;
-    gzip_min_length 256;
+    # WebSocket and HTTP requests
+    location / {
+        proxy_pass http://broadcast_relay;
+        proxy_http_version 1.1;
+        
+        # WebSocket upgrade headers
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        
+        # Standard proxy headers
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # Timeouts for long-lived WebSocket connections
+        proxy_connect_timeout 7d;
+        proxy_send_timeout 7d;
+        proxy_read_timeout 7d;
+        
+        # Disable buffering for WebSocket
+        proxy_buffering off;
+    }
 
-    # Server block
-    server {
-        listen 80;
-        server_name _;
-
-        # Increase buffer sizes for WebSocket
-        proxy_buffer_size 16k;
-        proxy_buffers 8 16k;
-        proxy_busy_buffers_size 32k;
-
-        # WebSocket and HTTP requests
-        location / {
-            proxy_pass http://relay;
-            proxy_http_version 1.1;
-            
-            # WebSocket upgrade headers
-            proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection "upgrade";
-            
-            # Standard proxy headers
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-            
-            # Timeouts for long-lived WebSocket connections
-            proxy_connect_timeout 7d;
-            proxy_send_timeout 7d;
-            proxy_read_timeout 7d;
-            
-            # Disable buffering for WebSocket
-            proxy_buffering off;
-            
-            # Keep connection alive
-            proxy_http_version 1.1;
-            proxy_set_header Connection "";
-        }
-
-        # Health check endpoint
-        location /health {
-            access_log off;
-            return 200 "OK\n";
-            add_header Content-Type text/plain;
-        }
+    # Health check endpoint
+    location /health {
+        access_log off;
+        return 200 "OK\n";
+        add_header Content-Type text/plain;
     }
 }
+
+# HTTPS server block (optional - for use with Let's Encrypt)
+# Uncomment and configure after obtaining SSL certificate
+# server {
+#     listen 443 ssl http2;
+#     listen [::]:443 ssl http2;
+#     
+#     server_name relay.example.com;
+#     
+#     # SSL certificate (use certbot to obtain)
+#     ssl_certificate /etc/letsencrypt/live/relay.example.com/fullchain.pem;
+#     ssl_certificate_key /etc/letsencrypt/live/relay.example.com/privkey.pem;
+#     
+#     # SSL settings
+#     ssl_protocols TLSv1.2 TLSv1.3;
+#     ssl_ciphers HIGH:!aNULL:!MD5;
+#     ssl_prefer_server_ciphers on;
+#     
+#     # Logging
+#     access_log /var/log/nginx/broadcast-relay-access.log;
+#     error_log /var/log/nginx/broadcast-relay-error.log warn;
+#     
+#     # Proxy settings (same as HTTP)
+#     proxy_buffer_size 16k;
+#     proxy_buffers 8 16k;
+#     proxy_busy_buffers_size 32k;
+#     
+#     location / {
+#         proxy_pass http://broadcast_relay;
+#         proxy_http_version 1.1;
+#         proxy_set_header Upgrade $http_upgrade;
+#         proxy_set_header Connection "upgrade";
+#         proxy_set_header Host $host;
+#         proxy_set_header X-Real-IP $remote_addr;
+#         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#         proxy_set_header X-Forwarded-Proto $scheme;
+#         proxy_connect_timeout 7d;
+#         proxy_send_timeout 7d;
+#         proxy_read_timeout 7d;
+#         proxy_buffering off;
+#     }
+#     
+#     location /health {
+#         access_log off;
+#         return 200 "OK\n";
+#         add_header Content-Type text/plain;
+#     }
+# }

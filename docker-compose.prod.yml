@@ -31,8 +31,9 @@ services:
       - SUCCESS_RATE_DECAY=${SUCCESS_RATE_DECAY:-0.95}
     networks:
       - relay-network
-    expose:
-      - "3334"
+    ports:
+      # Expose to host for nginx proxy
+      - "127.0.0.1:3334:3334"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3334/stats"]
       interval: 30s
@@ -66,33 +67,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-  # Optional: Nginx reverse proxy for clearnet access
-  nginx:
-    image: nginx:alpine
-    container_name: broadcast-relay-nginx
-    restart: unless-stopped
-    depends_on:
-      - relay
-    ports:
-      - "${CLEARNET_PORT:-3334}:80"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-    networks:
-      - relay-network
-    profiles:
-      - clearnet
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/stats"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 5s
     logging:
       driver: "json-file"
       options:
