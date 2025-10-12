@@ -28,6 +28,12 @@ type Broadcaster struct {
 	ctx             context.Context
 	cancel          context.CancelFunc
 	wg              sync.WaitGroup
+	// Event deduplication cache
+	eventCache   map[string]bool
+	cacheMutex   sync.RWMutex
+	cacheMaxSize int
+	cacheHits    int64
+	cacheMisses  int64
 }
 
 func NewBroadcaster(mgr *manager.Manager, checker *health.Checker, mandatoryRelays []string, workerCount int) *Broadcaster {
@@ -38,8 +44,10 @@ func NewBroadcaster(mgr *manager.Manager, checker *health.Checker, mandatoryRela
 
 	ctx, cancel := context.WithCancel(context.Background())
 	channelCapacity := workerCount * 10
+	cacheMaxSize := 100000 // ~10MB: 100K event IDs @ ~100 bytes each
 
 	logging.Info("Broadcaster: Channel capacity set to %d (10 * %d workers)", channelCapacity, workerCount)
+	logging.Info("Broadcaster: Event cache initialized with max size %d (~10MB)", cacheMaxSize)
 
 	return &Broadcaster{
 		manager:         mgr,
@@ -54,6 +62,10 @@ func NewBroadcaster(mgr *manager.Manager, checker *health.Checker, mandatoryRela
 		workerCount:     workerCount,
 		ctx:             ctx,
 		cancel:          cancel,
+		eventCache:      make(map[string]bool),
+		cacheMaxSize:    cacheMaxSize,
+		cacheHits:       0,
+		cacheMisses:     0,
 	}
 }
 
@@ -120,6 +132,44 @@ func (b *Broadcaster) backfillChannel() {
 	}
 }
 
+// isEventCached checks if an event has already been broadcast
+func (b *Broadcaster) isEventCached(eventID string) bool {
+	b.cacheMutex.RLock()
+	defer b.cacheMutex.RUnlock()
+
+	_, exists := b.eventCache[eventID]
+	if exists {
+		atomic.AddInt64(&b.cacheHits, 1)
+	} else {
+		atomic.AddInt64(&b.cacheMisses, 1)
+	}
+	return exists
+}
+
+// addEventToCache adds an event ID to the cache
+func (b *Broadcaster) addEventToCache(eventID string) {
+	b.cacheMutex.Lock()
+	defer b.cacheMutex.Unlock()
+
+	// Check if cache is at max capacity
+	if len(b.eventCache) >= b.cacheMaxSize {
+		// Clear 20% of the cache to make room (simple cleanup strategy)
+		// In production, you might want LRU eviction instead
+		toRemove := b.cacheMaxSize / 5
+		removed := 0
+		for key := range b.eventCache {
+			delete(b.eventCache, key)
+			removed++
+			if removed >= toRemove {
+				break
+			}
+		}
+		logging.Info("Broadcaster: Cache full, removed %d old entries (cache size: %d)", removed, len(b.eventCache))
+	}
+
+	b.eventCache[eventID] = true
+}
+
 // Broadcast enqueues an event for broadcasting
 func (b *Broadcaster) Broadcast(event *nostr.Event) {
 	// Check if shutting down
@@ -129,6 +179,15 @@ func (b *Broadcaster) Broadcast(event *nostr.Event) {
 		return
 	default:
 	}
+
+	// Check if event was already broadcast (prevent recursion/duplicates)
+	if b.isEventCached(event.ID) {
+		logging.Debug("Broadcaster: Event %s (kind %d) already broadcast, skipping (cache hit)", event.ID, event.Kind)
+		return
+	}
+
+	// Add to cache before queueing
+	b.addEventToCache(event.ID)
 
 	// Try to add to channel first (fast path)
 	select {
@@ -296,6 +355,19 @@ func (b *Broadcaster) GetStats() map[string]interface{} {
 	channelUtilization := float64(channelSize) / float64(b.channelCapacity) * 100.0
 	isSaturated := overflowSize > 0
 
+	// Get cache stats
+	b.cacheMutex.RLock()
+	cacheSize := len(b.eventCache)
+	b.cacheMutex.RUnlock()
+	cacheHits := atomic.LoadInt64(&b.cacheHits)
+	cacheMisses := atomic.LoadInt64(&b.cacheMisses)
+	totalCacheAccess := cacheHits + cacheMisses
+	cacheHitRate := 0.0
+	if totalCacheAccess > 0 {
+		cacheHitRate = float64(cacheHits) / float64(totalCacheAccess) * 100.0
+	}
+	cacheUtilization := float64(cacheSize) / float64(b.cacheMaxSize) * 100.0
+
 	stats := map[string]interface{}{
 		"total_relays":     totalRelays,
 		"active_relays":    len(topRelays),
@@ -311,6 +383,14 @@ func (b *Broadcaster) GetStats() map[string]interface{} {
 			"saturation_count":    saturationCount,
 			"is_saturated":        isSaturated,
 			"last_saturation":     b.lastSaturation,
+		},
+		"cache": map[string]interface{}{
+			"size":            cacheSize,
+			"max_size":        b.cacheMaxSize,
+			"utilization_pct": cacheUtilization,
+			"hits":            cacheHits,
+			"misses":          cacheMisses,
+			"hit_rate_pct":    cacheHitRate,
 		},
 		"mandatory_relay_list": make([]map[string]interface{}, 0, len(mandatoryRelays)),
 		"top_relays":           make([]map[string]interface{}, 0, len(topRelays)),

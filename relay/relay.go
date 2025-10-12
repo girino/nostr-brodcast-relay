@@ -149,6 +149,17 @@ func (r *Relay) Start() error {
 		fmt.Fprintf(w, "    \"last_saturation\": \"%v\"\n", queue["last_saturation"])
 		fmt.Fprintf(w, "  },\n")
 
+		// Cache stats
+		cache := stats["cache"].(map[string]interface{})
+		fmt.Fprintf(w, "  \"cache\": {\n")
+		fmt.Fprintf(w, "    \"size\": %d,\n", cache["size"])
+		fmt.Fprintf(w, "    \"max_size\": %d,\n", cache["max_size"])
+		fmt.Fprintf(w, "    \"utilization_pct\": %.2f,\n", cache["utilization_pct"])
+		fmt.Fprintf(w, "    \"hits\": %d,\n", cache["hits"])
+		fmt.Fprintf(w, "    \"misses\": %d,\n", cache["misses"])
+		fmt.Fprintf(w, "    \"hit_rate_pct\": %.2f\n", cache["hit_rate_pct"])
+		fmt.Fprintf(w, "  },\n")
+
 		// Mandatory relays
 		mandatoryRelays := stats["mandatory_relay_list"].([]map[string]interface{})
 		fmt.Fprintf(w, "  \"mandatory_relay_list\": [\n")
