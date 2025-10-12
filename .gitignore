@@ -39,3 +39,15 @@ Thumbs.db
 # Plan files
 *.plan.md
 
+# Tor hidden service data and sensitive files
+tor-data/
+tor-config/
+hidden_service/
+*.onion
+hostname
+private_key
+hs_ed25519_public_key
+hs_ed25519_secret_key
+
+# Nginx config (may contain sensitive data)
+nginx.conf

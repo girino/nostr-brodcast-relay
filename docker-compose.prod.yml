@@ -1,0 +1,94 @@
+version: '3.8'
+
+services:
+  relay:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: broadcast-relay
+    restart: unless-stopped
+    environment:
+      # Relay configuration
+      - RELAY_PORT=3334
+      - SEED_RELAYS=wss://relay.damus.io,wss://nos.lol,wss://relay.nostr.band
+      - MANDATORY_RELAYS=${MANDATORY_RELAYS:-}
+      - TOP_N_RELAYS=${TOP_N_RELAYS:-50}
+      
+      # Worker configuration
+      - WORKER_COUNT=${WORKER_COUNT:-0}  # 0 = auto (2*CPU)
+      
+      # Cache configuration
+      - CACHE_TTL=${CACHE_TTL:-5m}
+      
+      # Health and refresh intervals
+      - REFRESH_INTERVAL=${REFRESH_INTERVAL:-24h}
+      - HEALTH_CHECK_INTERVAL=${HEALTH_CHECK_INTERVAL:-5m}
+      - INITIAL_TIMEOUT=${INITIAL_TIMEOUT:-5s}
+      
+      # Performance tuning
+      - SUCCESS_RATE_DECAY=${SUCCESS_RATE_DECAY:-0.95}
+    networks:
+      - relay-network
+    expose:
+      - "3334"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3334/stats"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  tor:
+    image: goldy/tor-hidden-service:latest
+    container_name: broadcast-relay-tor
+    restart: unless-stopped
+    depends_on:
+      - relay
+    environment:
+      # Hidden service configuration
+      - RELAY_SERVICE_HOSTS=80:relay:3334
+      - RELAY_SERVICE_VERSION=3
+    volumes:
+      # Persist Tor hidden service keys
+      - ./tor-data:/var/lib/tor/hidden_service
+    networks:
+      - relay-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Optional: Nginx reverse proxy for clearnet access
+  nginx:
+    image: nginx:alpine
+    container_name: broadcast-relay-nginx
+    restart: unless-stopped
+    depends_on:
+      - relay
+    ports:
+      - "${CLEARNET_PORT:-3334}:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - relay-network
+    profiles:
+      - clearnet
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  relay-network:
+    driver: bridge
+
+volumes:
+  tor-data:
+
