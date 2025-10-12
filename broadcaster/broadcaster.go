@@ -37,9 +37,9 @@ func NewBroadcaster(mgr *manager.Manager, checker *health.Checker, mandatoryRela
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	channelCapacity := workerCount * 50
+	channelCapacity := workerCount * 10
 
-	logging.Info("Broadcaster: Channel capacity set to %d (50 * %d workers)", channelCapacity, workerCount)
+	logging.Info("Broadcaster: Channel capacity set to %d (10 * %d workers)", channelCapacity, workerCount)
 
 	return &Broadcaster{
 		manager:         mgr,

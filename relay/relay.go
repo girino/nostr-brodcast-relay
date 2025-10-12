@@ -133,7 +133,7 @@ func (r *Relay) Start() error {
 		fmt.Fprintf(w, "  \"total_relays\": %d,\n", stats["total_relays"])
 		fmt.Fprintf(w, "  \"active_relays\": %d,\n", stats["active_relays"])
 		fmt.Fprintf(w, "  \"mandatory_relays\": %d,\n", stats["mandatory_relays"])
-		
+
 		// Queue stats
 		queue := stats["queue"].(map[string]interface{})
 		fmt.Fprintf(w, "  \"queue\": {\n")
@@ -148,7 +148,7 @@ func (r *Relay) Start() error {
 		fmt.Fprintf(w, "    \"is_saturated\": %v,\n", queue["is_saturated"])
 		fmt.Fprintf(w, "    \"last_saturation\": \"%v\"\n", queue["last_saturation"])
 		fmt.Fprintf(w, "  },\n")
-		
+
 		// Mandatory relays
 		mandatoryRelays := stats["mandatory_relay_list"].([]map[string]interface{})
 		fmt.Fprintf(w, "  \"mandatory_relay_list\": [\n")
@@ -166,7 +166,7 @@ func (r *Relay) Start() error {
 			}
 		}
 		fmt.Fprintf(w, "  ],\n")
-		
+
 		fmt.Fprintf(w, "  \"top_relays\": [\n")
 
 		topRelays := stats["top_relays"].([]map[string]interface{})
