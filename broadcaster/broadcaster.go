@@ -122,10 +122,8 @@ func (b *Broadcaster) GetStats() map[string]interface{} {
 		"top_relays":    make([]map[string]interface{}, 0, len(topRelays)),
 	}
 
-	for i, relay := range topRelays {
-		if i >= 10 { // Only show top 10 in stats
-			break
-		}
+	// Show all active relays
+	for _, relay := range topRelays {
 		score := b.manager.CalculateScore(relay)
 		relayStats := map[string]interface{}{
 			"url":             relay.URL,
