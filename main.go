@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"log"
 	"os"
 	"os/signal"
@@ -16,7 +17,21 @@ import (
 	"github.com/girino/broadcast-relay/relay"
 )
 
+var Verbose bool
+
 func main() {
+	// Parse command-line flags
+	flag.BoolVar(&Verbose, "verbose", false, "Enable verbose logging")
+	flag.BoolVar(&Verbose, "v", false, "Enable verbose logging (shorthand)")
+	flag.Parse()
+
+	// Set verbose flag in other packages
+	manager.Verbose = &Verbose
+	broadcaster.Verbose = &Verbose
+	health.Verbose = &Verbose
+	discovery.Verbose = &Verbose
+	relay.Verbose = &Verbose
+
 	log.Println("==============================================================")
 	log.Println("=== BROADCAST RELAY STARTING ===")
 	log.Println("==============================================================")
@@ -26,15 +41,19 @@ func main() {
 	log.Println("")
 	log.Println("[CONFIG] Configuration loaded:")
 	log.Printf("[CONFIG]   - Seed relays: %d", len(cfg.SeedRelays))
-	for i, seed := range cfg.SeedRelays {
-		log.Printf("[CONFIG]     %d. %s", i+1, seed)
+	if Verbose {
+		for i, seed := range cfg.SeedRelays {
+			log.Printf("[CONFIG]     %d. %s", i+1, seed)
+		}
 	}
 	log.Printf("[CONFIG]   - Top N relays: %d", cfg.TopNRelays)
 	log.Printf("[CONFIG]   - Relay port: %s", cfg.RelayPort)
-	log.Printf("[CONFIG]   - Refresh interval: %v", cfg.RefreshInterval)
-	log.Printf("[CONFIG]   - Health check interval: %v", cfg.HealthCheckInterval)
-	log.Printf("[CONFIG]   - Initial timeout: %v", cfg.InitialTimeout)
-	log.Printf("[CONFIG]   - Success rate decay: %.2f", cfg.SuccessRateDecay)
+	if Verbose {
+		log.Printf("[CONFIG]   - Refresh interval: %v", cfg.RefreshInterval)
+		log.Printf("[CONFIG]   - Health check interval: %v", cfg.HealthCheckInterval)
+		log.Printf("[CONFIG]   - Initial timeout: %v", cfg.InitialTimeout)
+		log.Printf("[CONFIG]   - Success rate decay: %.2f", cfg.SuccessRateDecay)
+	}
 	log.Println("")
 
 	// Initialize components
@@ -59,12 +78,14 @@ func main() {
 	log.Println("[MAIN] ========== PHASE 2: INITIAL RELAY SELECTION ==========")
 	topRelays := mgr.GetTopRelays()
 	log.Printf("[MAIN] Selected top %d relays from %d total relays", len(topRelays), mgr.GetRelayCount())
-	log.Println("[MAIN] Top 10 relays:")
-	for i, r := range topRelays {
-		if i < 10 { // Show top 10
-			log.Printf("[MAIN]   %d. %s", i+1, r.URL)
-			log.Printf("[MAIN]      Success: %.2f%%, Avg time: %.2fms, Attempts: %d",
-				r.SuccessRate*100, float64(r.AvgResponseTime.Milliseconds()), r.TotalAttempts)
+	if Verbose {
+		log.Println("[MAIN] Top 10 relays:")
+		for i, r := range topRelays {
+			if i < 10 { // Show top 10
+				log.Printf("[MAIN]   %d. %s", i+1, r.URL)
+				log.Printf("[MAIN]      Success: %.2f%%, Avg time: %.2fms, Attempts: %d", 
+					r.SuccessRate*100, float64(r.AvgResponseTime.Milliseconds()), r.TotalAttempts)
+			}
 		}
 	}
 	log.Println("")
@@ -121,20 +142,26 @@ func startPeriodicRefresh(ctx context.Context, cfg *config.Config, disc *discove
 	for {
 		select {
 		case <-ticker.C:
-			log.Println("")
-			log.Println("==============================================================")
-			log.Println("[REFRESH] === STARTING PERIODIC RELAY REFRESH ===")
-			log.Println("==============================================================")
-
+			if Verbose {
+				log.Println("")
+				log.Println("==============================================================")
+				log.Println("[REFRESH] === STARTING PERIODIC RELAY REFRESH ===")
+				log.Println("==============================================================")
+			}
+			
 			disc.DiscoverFromSeeds(ctx, cfg.SeedRelays)
-
+			
 			topRelays := mgr.GetTopRelays()
 			log.Printf("[REFRESH] Refresh complete: %d top relays from %d total relays", len(topRelays), mgr.GetRelayCount())
-			log.Println("==============================================================")
-			log.Println("")
-
+			if Verbose {
+				log.Println("==============================================================")
+				log.Println("")
+			}
+			
 		case <-ctx.Done():
-			log.Println("[REFRESH] Periodic refresh stopped")
+			if Verbose {
+				log.Println("[REFRESH] Periodic refresh stopped")
+			}
 			return
 		}
 	}

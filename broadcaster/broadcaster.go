@@ -11,13 +11,17 @@ import (
 	"github.com/nbd-wtf/go-nostr"
 )
 
+var Verbose *bool
+
 type Broadcaster struct {
 	manager *manager.Manager
 	checker *health.Checker
 }
 
 func NewBroadcaster(mgr *manager.Manager, checker *health.Checker) *Broadcaster {
-	log.Println("[BROADCASTER] Initializing broadcaster")
+	if Verbose != nil && *Verbose {
+		log.Println("[BROADCASTER] Initializing broadcaster")
+	}
 	return &Broadcaster{
 		manager: mgr,
 		checker: checker,
@@ -33,10 +37,9 @@ func (b *Broadcaster) Broadcast(event *nostr.Event) {
 		return
 	}
 
-	log.Printf("[BROADCASTER] ======================================")
-	log.Printf("[BROADCASTER] Broadcasting event %s (kind %d) to %d relays", event.ID, event.Kind, len(topRelays))
-	log.Printf("[BROADCASTER] Event author: %s", event.PubKey[:16]+"...")
-	log.Printf("[BROADCASTER] Event content length: %d bytes", len(event.Content))
+	if Verbose != nil && *Verbose {
+		log.Printf("[BROADCASTER] Broadcasting event %s (kind %d) to %d relays", event.ID, event.Kind, len(topRelays))
+	}
 
 	var wg sync.WaitGroup
 	successCount := 0
@@ -61,8 +64,10 @@ func (b *Broadcaster) Broadcast(event *nostr.Event) {
 	// Track results in background
 	go func() {
 		wg.Wait()
-		log.Printf("[BROADCASTER] Broadcast complete for event %s | success=%d, failed=%d, total=%d",
-			event.ID, successCount, failCount, len(topRelays))
+		if Verbose != nil && *Verbose {
+			log.Printf("[BROADCASTER] Broadcast complete for event %s | success=%d, failed=%d, total=%d",
+				event.ID, successCount, failCount, len(topRelays))
+		}
 	}()
 }
 
@@ -73,11 +78,11 @@ func (b *Broadcaster) publishToRelay(url string, event *nostr.Event) bool {
 
 	start := time.Now()
 
-	log.Printf("[BROADCASTER] Publishing to %s...", url)
-
 	relay, err := nostr.RelayConnect(ctx, url)
 	if err != nil {
-		log.Printf("[BROADCASTER] FAILED to connect to %s: %v", url, err)
+		if Verbose != nil && *Verbose {
+			log.Printf("[BROADCASTER] FAILED to connect to %s: %v", url, err)
+		}
 		b.checker.TrackPublishResult(health.PublishResult{
 			URL:          url,
 			Success:      false,
@@ -100,12 +105,14 @@ func (b *Broadcaster) publishToRelay(url string, event *nostr.Event) bool {
 		Error:        err,
 	})
 
-	if success {
-		log.Printf("[BROADCASTER] SUCCESS: Published event %s to %s (%.2fms)",
-			event.ID, url, elapsed.Seconds()*1000)
-	} else {
-		log.Printf("[BROADCASTER] FAILED to publish to %s: %v (%.2fms)",
-			url, err, elapsed.Seconds()*1000)
+	if Verbose != nil && *Verbose {
+		if success {
+			log.Printf("[BROADCASTER] SUCCESS: Published event %s to %s (%.2fms)",
+				event.ID, url, elapsed.Seconds()*1000)
+		} else {
+			log.Printf("[BROADCASTER] FAILED to publish to %s: %v (%.2fms)",
+				url, err, elapsed.Seconds()*1000)
+		}
 	}
 
 	return success
