@@ -79,6 +79,17 @@ go build -o broadcast-relay
 
 Configure the relay using environment variables. See [CONFIG.md](CONFIG.md) for detailed configuration options.
 
+An `example.env` file is provided with all configuration options. You can:
+
+1. Copy and modify it:
+```bash
+cp example.env .env
+# Edit .env with your settings
+source .env
+```
+
+2. Or set variables directly:
+
 ### Required Configuration
 
 ```bash
