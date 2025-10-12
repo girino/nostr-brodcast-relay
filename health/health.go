@@ -6,11 +6,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/girino/broadcast-relay/logging"
 	"github.com/girino/broadcast-relay/manager"
 	"github.com/nbd-wtf/go-nostr"
 )
-
-var Verbose *bool
 
 type Checker struct {
 	manager        *manager.Manager
@@ -18,9 +17,7 @@ type Checker struct {
 }
 
 func NewChecker(mgr *manager.Manager, initialTimeout time.Duration) *Checker {
-	if Verbose != nil && *Verbose {
-		log.Printf("[HEALTH] Initializing health checker with timeout=%v", initialTimeout)
-	}
+	logging.LogV("[HEALTH] Initializing health checker with timeout=%v", initialTimeout)
 	return &Checker{
 		manager:        mgr,
 		initialTimeout: initialTimeout,
@@ -29,9 +26,7 @@ func NewChecker(mgr *manager.Manager, initialTimeout time.Duration) *Checker {
 
 // CheckInitial performs initial timeout-based health check on a relay
 func (c *Checker) CheckInitial(url string) bool {
-	if Verbose != nil && *Verbose {
-		log.Printf("[HEALTH] Testing relay: %s", url)
-	}
+	logging.LogV("[HEALTH] Testing relay: %s", url)
 	
 	ctx, cancel := context.WithTimeout(context.Background(), c.initialTimeout)
 	defer cancel()
@@ -40,9 +35,7 @@ func (c *Checker) CheckInitial(url string) bool {
 	relay, err := nostr.RelayConnect(ctx, url)
 	if err != nil {
 		elapsed := time.Since(start)
-		if Verbose != nil && *Verbose {
-			log.Printf("[HEALTH] FAILED: %s | error=%v | time=%.2fms", url, err, elapsed.Seconds()*1000)
-		}
+		logging.LogV("[HEALTH] FAILED: %s | error=%v | time=%.2fms", url, err, elapsed.Seconds()*1000)
 		c.manager.UpdateHealth(url, false, 0)
 		return false
 	}
@@ -52,18 +45,14 @@ func (c *Checker) CheckInitial(url string) bool {
 	
 	// Consider it successful if we connected
 	c.manager.UpdateHealth(url, true, elapsed)
-	if Verbose != nil && *Verbose {
-		log.Printf("[HEALTH] SUCCESS: %s | time=%.2fms", url, elapsed.Seconds()*1000)
-	}
+	logging.LogV("[HEALTH] SUCCESS: %s | time=%.2fms", url, elapsed.Seconds()*1000)
 	return true
 }
 
 // CheckBatch performs initial checks on multiple relays concurrently
 func (c *Checker) CheckBatch(urls []string) {
-	if Verbose != nil && *Verbose {
-		log.Printf("[HEALTH] ========== Starting batch health check ==========")
-		log.Printf("[HEALTH] Testing %d relays (max 20 concurrent)", len(urls))
-	}
+	logging.LogV("[HEALTH] ========== Starting batch health check ==========")
+	logging.LogV("[HEALTH] Testing %d relays (max 20 concurrent)", len(urls))
 	
 	sem := make(chan struct{}, 20) // Limit concurrent checks
 	var wg sync.WaitGroup
@@ -111,7 +100,7 @@ type PublishResult struct {
 func (c *Checker) TrackPublishResult(result PublishResult) {
 	c.manager.UpdateHealth(result.URL, result.Success, result.ResponseTime)
 	
-	if !result.Success && result.Error != nil && Verbose != nil && *Verbose {
-		log.Printf("[HEALTH] Publish to %s failed: %v", result.URL, result.Error)
+	if !result.Success && result.Error != nil {
+		logging.LogV("[HEALTH] Publish to %s failed: %v", result.URL, result.Error)
 	}
 }

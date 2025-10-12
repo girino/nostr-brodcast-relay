@@ -13,24 +13,20 @@ import (
 	"github.com/girino/broadcast-relay/config"
 	"github.com/girino/broadcast-relay/discovery"
 	"github.com/girino/broadcast-relay/health"
+	"github.com/girino/broadcast-relay/logging"
 	"github.com/girino/broadcast-relay/manager"
 	"github.com/girino/broadcast-relay/relay"
 )
 
-var Verbose bool
-
 func main() {
 	// Parse command-line flags
-	flag.BoolVar(&Verbose, "verbose", false, "Enable verbose logging")
-	flag.BoolVar(&Verbose, "v", false, "Enable verbose logging (shorthand)")
+	var verbose bool
+	flag.BoolVar(&verbose, "verbose", false, "Enable verbose logging")
+	flag.BoolVar(&verbose, "v", false, "Enable verbose logging (shorthand)")
 	flag.Parse()
 
-	// Set verbose flag in other packages
-	manager.Verbose = &Verbose
-	broadcaster.Verbose = &Verbose
-	health.Verbose = &Verbose
-	discovery.Verbose = &Verbose
-	relay.Verbose = &Verbose
+	// Set verbose mode in logging package
+	logging.SetVerbose(verbose)
 
 	log.Println("==============================================================")
 	log.Println("=== BROADCAST RELAY STARTING ===")
@@ -41,14 +37,14 @@ func main() {
 	log.Println("")
 	log.Println("[CONFIG] Configuration loaded:")
 	log.Printf("[CONFIG]   - Seed relays: %d", len(cfg.SeedRelays))
-	if Verbose {
+	if verbose {
 		for i, seed := range cfg.SeedRelays {
 			log.Printf("[CONFIG]     %d. %s", i+1, seed)
 		}
 	}
 	log.Printf("[CONFIG]   - Top N relays: %d", cfg.TopNRelays)
 	log.Printf("[CONFIG]   - Relay port: %s", cfg.RelayPort)
-	if Verbose {
+	if verbose {
 		log.Printf("[CONFIG]   - Refresh interval: %v", cfg.RefreshInterval)
 		log.Printf("[CONFIG]   - Health check interval: %v", cfg.HealthCheckInterval)
 		log.Printf("[CONFIG]   - Initial timeout: %v", cfg.InitialTimeout)
@@ -78,7 +74,7 @@ func main() {
 	log.Println("[MAIN] ========== PHASE 2: INITIAL RELAY SELECTION ==========")
 	topRelays := mgr.GetTopRelays()
 	log.Printf("[MAIN] Selected top %d relays from %d total relays", len(topRelays), mgr.GetRelayCount())
-	if Verbose {
+	if verbose {
 		log.Println("[MAIN] Top 10 relays:")
 		for i, r := range topRelays {
 			if i < 10 { // Show top 10
@@ -142,26 +138,20 @@ func startPeriodicRefresh(ctx context.Context, cfg *config.Config, disc *discove
 	for {
 		select {
 		case <-ticker.C:
-			if Verbose {
-				log.Println("")
-				log.Println("==============================================================")
-				log.Println("[REFRESH] === STARTING PERIODIC RELAY REFRESH ===")
-				log.Println("==============================================================")
-			}
+			logging.LogV("")
+			logging.LogV("==============================================================")
+			logging.LogV("[REFRESH] === STARTING PERIODIC RELAY REFRESH ===")
+			logging.LogV("==============================================================")
 			
 			disc.DiscoverFromSeeds(ctx, cfg.SeedRelays)
 			
 			topRelays := mgr.GetTopRelays()
 			log.Printf("[REFRESH] Refresh complete: %d top relays from %d total relays", len(topRelays), mgr.GetRelayCount())
-			if Verbose {
-				log.Println("==============================================================")
-				log.Println("")
-			}
+			logging.LogV("==============================================================")
+			logging.LogV("")
 			
 		case <-ctx.Done():
-			if Verbose {
-				log.Println("[REFRESH] Periodic refresh stopped")
-			}
+			logging.LogV("[REFRESH] Periodic refresh stopped")
 			return
 		}
 	}

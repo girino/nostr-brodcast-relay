@@ -5,9 +5,9 @@ import (
 	"sort"
 	"sync"
 	"time"
-)
 
-var Verbose *bool
+	"github.com/girino/broadcast-relay/logging"
+)
 
 type RelayInfo struct {
 	URL                string
@@ -27,9 +27,7 @@ type Manager struct {
 }
 
 func NewManager(topN int, decay float64) *Manager {
-	if Verbose != nil && *Verbose {
-		log.Printf("[MANAGER] Initializing manager: topN=%d, decay=%.2f", topN, decay)
-	}
+	logging.LogV("[MANAGER] Initializing manager: topN=%d, decay=%.2f", topN, decay)
 	return &Manager{
 		relays:      make(map[string]*RelayInfo),
 		decay:       decay,
@@ -52,11 +50,9 @@ func (m *Manager) AddRelay(url string) {
 			SuccessfulAttempts: 0,
 			LastChecked:        time.Now(),
 		}
-		if Verbose != nil && *Verbose {
-			log.Printf("[MANAGER] Added new relay: %s (total relays: %d)", url, len(m.relays))
-		}
-	} else if Verbose != nil && *Verbose {
-		log.Printf("[MANAGER] Relay already exists: %s", url)
+		logging.LogV("[MANAGER] Added new relay: %s (total relays: %d)", url, len(m.relays))
+	} else {
+		logging.LogV("[MANAGER] Relay already exists: %s", url)
 	}
 }
 
@@ -67,15 +63,13 @@ func (m *Manager) UpdateHealth(url string, success bool, responseTime time.Durat
 
 	relay, exists := m.relays[url]
 	if !exists {
-		if Verbose != nil && *Verbose {
-			log.Printf("[MANAGER] UpdateHealth called for unknown relay: %s", url)
-		}
+		logging.LogV("[MANAGER] UpdateHealth called for unknown relay: %s", url)
 		return
 	}
 
 	oldSuccessRate := relay.SuccessRate
 	relay.TotalAttempts++
-	
+
 	if success {
 		relay.SuccessfulAttempts++
 
@@ -87,13 +81,11 @@ func (m *Manager) UpdateHealth(url string, success bool, responseTime time.Durat
 				float64(relay.AvgResponseTime)*0.7 + float64(responseTime)*0.3,
 			)
 		}
-		
-		if Verbose != nil && *Verbose {
-			log.Printf("[MANAGER] Health update SUCCESS: %s | attempts=%d/%d | responseTime=%.2fms", 
-				url, relay.SuccessfulAttempts, relay.TotalAttempts, responseTime.Seconds()*1000)
-		}
-	} else if Verbose != nil && *Verbose {
-		log.Printf("[MANAGER] Health update FAILED: %s | attempts=%d/%d", 
+
+		logging.LogV("[MANAGER] Health update SUCCESS: %s | attempts=%d/%d | responseTime=%.2fms",
+			url, relay.SuccessfulAttempts, relay.TotalAttempts, responseTime.Seconds()*1000)
+	} else {
+		logging.LogV("[MANAGER] Health update FAILED: %s | attempts=%d/%d",
 			url, relay.SuccessfulAttempts, relay.TotalAttempts)
 	}
 
@@ -106,18 +98,14 @@ func (m *Manager) UpdateHealth(url string, success bool, responseTime time.Durat
 			successValue = 1.0
 		}
 		relay.SuccessRate = relay.SuccessRate*m.decay + successValue*(1-m.decay)
-		if Verbose != nil && *Verbose {
-			log.Printf("[MANAGER] Success rate updated (exponential decay): %s | %.4f -> %.4f", 
-				url, oldSuccessRate, relay.SuccessRate)
-		}
+		logging.LogV("[MANAGER] Success rate updated (exponential decay): %s | %.4f -> %.4f",
+			url, oldSuccessRate, relay.SuccessRate)
 	} else {
 		// During initialization, use simple success rate
 		if relay.TotalAttempts > 0 {
 			relay.SuccessRate = float64(relay.SuccessfulAttempts) / float64(relay.TotalAttempts)
-			if Verbose != nil && *Verbose {
-				log.Printf("[MANAGER] Success rate updated (simple): %s | %.4f -> %.4f", 
-					url, oldSuccessRate, relay.SuccessRate)
-			}
+			logging.LogV("[MANAGER] Success rate updated (simple): %s | %.4f -> %.4f",
+				url, oldSuccessRate, relay.SuccessRate)
 		}
 	}
 }
@@ -148,9 +136,7 @@ func (m *Manager) GetTopRelays() []*RelayInfo {
 		}
 	}
 
-	if Verbose != nil && *Verbose {
-		log.Printf("[MANAGER] GetTopRelays: %d tested relays, %d untested", len(relays), untested)
-	}
+	logging.LogV("[MANAGER] GetTopRelays: %d tested relays, %d untested", len(relays), untested)
 
 	// Sort by composite score
 	sort.Slice(relays, func(i, j int) bool {
@@ -160,7 +146,7 @@ func (m *Manager) GetTopRelays() []*RelayInfo {
 	})
 
 	// Log top 5 for visibility (in verbose mode)
-	if Verbose != nil && *Verbose {
+	if logging.Verbose {
 		logCount := 5
 		if len(relays) < logCount {
 			logCount = len(relays)
@@ -168,21 +154,17 @@ func (m *Manager) GetTopRelays() []*RelayInfo {
 		for i := 0; i < logCount; i++ {
 			r := relays[i]
 			score := m.calculateScore(r)
-			log.Printf("[MANAGER]   Top #%d: %s | score=%.2f | success=%.2f%% | avg_time=%.2fms | attempts=%d",
+			logging.LogV("[MANAGER]   Top #%d: %s | score=%.2f | success=%.2f%% | avg_time=%.2fms | attempts=%d",
 				i+1, r.URL, score, r.SuccessRate*100, r.AvgResponseTime.Seconds()*1000, r.TotalAttempts)
 		}
 	}
 
 	// Return top N
 	if len(relays) > m.topN {
-		if Verbose != nil && *Verbose {
-			log.Printf("[MANAGER] Returning top %d out of %d tested relays", m.topN, len(relays))
-		}
+		logging.LogV("[MANAGER] Returning top %d out of %d tested relays", m.topN, len(relays))
 		return relays[:m.topN]
 	}
-	if Verbose != nil && *Verbose {
-		log.Printf("[MANAGER] Returning all %d tested relays (less than topN=%d)", len(relays), m.topN)
-	}
+	logging.LogV("[MANAGER] Returning all %d tested relays (less than topN=%d)", len(relays), m.topN)
 	return relays
 }
 
@@ -236,11 +218,9 @@ func (m *Manager) GetRelayCount() int {
 func (m *Manager) RemoveRelay(url string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	delete(m.relays, url)
-	if Verbose != nil && *Verbose {
-		log.Printf("[MANAGER] Removed relay: %s", url)
-	}
+	logging.LogV("[MANAGER] Removed relay: %s", url)
 }
 
 // GetRelayInfo returns info about a specific relay

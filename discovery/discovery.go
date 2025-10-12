@@ -8,11 +8,10 @@ import (
 	"time"
 
 	"github.com/girino/broadcast-relay/health"
+	"github.com/girino/broadcast-relay/logging"
 	"github.com/girino/broadcast-relay/manager"
 	"github.com/nbd-wtf/go-nostr"
 )
-
-var Verbose *bool
 
 type Discovery struct {
 	manager *manager.Manager
@@ -20,9 +19,7 @@ type Discovery struct {
 }
 
 func NewDiscovery(mgr *manager.Manager, checker *health.Checker) *Discovery {
-	if Verbose != nil && *Verbose {
-		log.Println("[DISCOVERY] Initializing discovery module")
-	}
+	logging.LogV("[DISCOVERY] Initializing discovery module")
 	return &Discovery{
 		manager: mgr,
 		checker: checker,
@@ -31,16 +28,12 @@ func NewDiscovery(mgr *manager.Manager, checker *health.Checker) *Discovery {
 
 // DiscoverFromSeeds performs initial relay discovery from seed relays
 func (d *Discovery) DiscoverFromSeeds(ctx context.Context, seedRelays []string) {
-	if Verbose != nil && *Verbose {
-		log.Printf("[DISCOVERY] ========== Starting seed discovery ==========")
-	}
+	logging.LogV("[DISCOVERY] ========== Starting seed discovery ==========")
 	log.Printf("[DISCOVERY] Using %d seed relays", len(seedRelays))
 
 	// First, add seed relays to manager
 	for _, seed := range seedRelays {
-		if Verbose != nil && *Verbose {
-			log.Printf("[DISCOVERY] Adding seed relay: %s", seed)
-		}
+		logging.LogV("[DISCOVERY] Adding seed relay: %s", seed)
 		d.manager.AddRelay(seed)
 	}
 
@@ -48,18 +41,14 @@ func (d *Discovery) DiscoverFromSeeds(ctx context.Context, seedRelays []string) 
 	relayURLs := make(map[string]bool)
 	
 	for i, seedURL := range seedRelays {
-		if Verbose != nil && *Verbose {
-			log.Printf("[DISCOVERY] Fetching relay lists from seed %d/%d: %s", i+1, len(seedRelays), seedURL)
-		}
+		logging.LogV("[DISCOVERY] Fetching relay lists from seed %d/%d: %s", i+1, len(seedRelays), seedURL)
 		relays := d.fetchRelaysFromRelay(ctx, seedURL)
 		for _, relay := range relays {
 			relayURLs[relay] = true
 		}
 	}
 
-	if Verbose != nil && *Verbose {
-		log.Printf("[DISCOVERY] Found %d unique relay URLs from seeds", len(relayURLs))
-	}
+	logging.LogV("[DISCOVERY] Found %d unique relay URLs from seeds", len(relayURLs))
 
 	// Add discovered relays
 	newRelays := []string{}
@@ -80,15 +69,13 @@ func (d *Discovery) DiscoverFromSeeds(ctx context.Context, seedRelays []string) 
 // fetchRelaysFromRelay fetches relay lists from a specific relay
 func (d *Discovery) fetchRelaysFromRelay(ctx context.Context, relayURL string) []string {
 	relaySet := make(map[string]bool)
-	
+
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
 	relay, err := nostr.RelayConnect(ctx, relayURL)
 	if err != nil {
-		if Verbose != nil && *Verbose {
-			log.Printf("[DISCOVERY] Failed to connect to seed relay %s: %v", relayURL, err)
-		}
+		logging.LogV("[DISCOVERY] Failed to connect to seed relay %s: %v", relayURL, err)
 		return []string{}
 	}
 	defer relay.Close()
@@ -103,15 +90,13 @@ func (d *Discovery) fetchRelaysFromRelay(ctx context.Context, relayURL string) [
 
 	sub, err := relay.Subscribe(ctx, filters)
 	if err != nil {
-		if Verbose != nil && *Verbose {
-			log.Printf("[DISCOVERY] Failed to subscribe to %s: %v", relayURL, err)
-		}
+		logging.LogV("[DISCOVERY] Failed to subscribe to %s: %v", relayURL, err)
 		return []string{}
 	}
 
 	// Collect events with timeout
 	timeout := time.After(10 * time.Second)
-	
+
 	for {
 		select {
 		case event := <-sub.Events:
@@ -141,9 +126,7 @@ done:
 		result = append(result, relay)
 	}
 	
-	if Verbose != nil && *Verbose {
-		log.Printf("[DISCOVERY] Fetched %d relay URLs from %s", len(result), relayURL)
-	}
+	logging.LogV("[DISCOVERY] Fetched %d relay URLs from %s", len(result), relayURL)
 	return result
 }
 
@@ -161,7 +144,7 @@ func (d *Discovery) extractRelaysFromEvent(event *nostr.Event) []string {
 		if event.Content != "" {
 			relays = append(relays, d.parseContactListContent(event.Content)...)
 		}
-		
+
 	case 10002: // Relay list metadata (NIP-65)
 		// Format: ["r", "<relay-url>", "<read|write>"]
 		for _, tag := range event.Tags {
@@ -193,7 +176,7 @@ func (d *Discovery) extractRelaysFromEvent(event *nostr.Event) []string {
 // parseContactListContent parses relay URLs from kind 3 content
 func (d *Discovery) parseContactListContent(content string) []string {
 	relays := []string{}
-	
+
 	// Content is typically a JSON object with relay URLs as keys
 	var relayMap map[string]interface{}
 	if err := json.Unmarshal([]byte(content), &relayMap); err != nil {
@@ -213,7 +196,7 @@ func (d *Discovery) parseContactListContent(content string) []string {
 // normalizeRelayURL normalizes and validates a relay URL
 func normalizeRelayURL(url string) string {
 	url = strings.TrimSpace(url)
-	
+
 	if url == "" {
 		return ""
 	}
@@ -242,12 +225,9 @@ func (d *Discovery) AddRelayIfNew(url string) {
 	}
 
 	if !d.isAlreadyKnown(url) {
-		if Verbose != nil && *Verbose {
-			log.Printf("[DISCOVERY] New relay discovered: %s (testing...)", url)
-		}
+		logging.LogV("[DISCOVERY] New relay discovered: %s (testing...)", url)
 		d.manager.AddRelay(url)
 		// Test the new relay
 		go d.checker.CheckInitial(url)
 	}
 }
-
