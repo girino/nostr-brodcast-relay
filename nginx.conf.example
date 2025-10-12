@@ -4,9 +4,13 @@
 # 
 # Installation:
 # 1. Copy this file: sudo cp nginx.conf.example /etc/nginx/sites-available/broadcast-relay
-# 2. Create symlink: sudo ln -s /etc/nginx/sites-available/broadcast-relay /etc/nginx/sites-enabled/
-# 3. Test config: sudo nginx -t
-# 4. Reload nginx: sudo systemctl reload nginx
+# 2. Edit server_name: sudo nano /etc/nginx/sites-available/broadcast-relay
+# 3. Create symlink: sudo ln -s /etc/nginx/sites-available/broadcast-relay /etc/nginx/sites-enabled/
+# 4. Test config: sudo nginx -t
+# 5. Reload nginx: sudo systemctl reload nginx
+# 6. (Optional) Get SSL with certbot: sudo certbot --nginx -d relay.example.com
+#
+# Certbot will automatically add SSL configuration to this file
 
 # Upstream backend - the broadcast relay Docker container
 # Exposed on localhost:3334 from docker-compose
@@ -15,31 +19,36 @@ upstream broadcast_relay {
     keepalive 32;
 }
 
-# HTTP server block (port 80)
+# Map to determine WebSocket upgrade
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    '' close;
+}
+
+# HTTP server block
 server {
     listen 80;
     listen [::]:80;
     
-    # Change to your domain name or use _ for default
+    # Change to your domain name
     server_name relay.example.com;
     
     # Logging
     access_log /var/log/nginx/broadcast-relay-access.log;
     error_log /var/log/nginx/broadcast-relay-error.log warn;
 
-    # Increase buffer sizes for WebSocket
-    proxy_buffer_size 16k;
-    proxy_buffers 8 16k;
-    proxy_busy_buffers_size 32k;
+    # Client body size (for large events)
+    client_max_body_size 1M;
 
-    # WebSocket and HTTP requests
+    # WebSocket and HTTP requests to relay
     location / {
+        # Proxy to upstream
         proxy_pass http://broadcast_relay;
         proxy_http_version 1.1;
         
-        # WebSocket upgrade headers
+        # WebSocket upgrade headers - CRITICAL for Nostr relay
         proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
+        proxy_set_header Connection $connection_upgrade;
         
         # Standard proxy headers
         proxy_set_header Host $host;
@@ -48,15 +57,21 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
         
         # Timeouts for long-lived WebSocket connections
-        proxy_connect_timeout 7d;
-        proxy_send_timeout 7d;
-        proxy_read_timeout 7d;
+        # Nostr relays keep connections open for subscriptions
+        proxy_connect_timeout 1h;
+        proxy_send_timeout 1h;
+        proxy_read_timeout 1h;
         
-        # Disable buffering for WebSocket
+        # Disable buffering for WebSocket real-time data
         proxy_buffering off;
+        
+        # Increase buffer sizes for WebSocket frames
+        proxy_buffer_size 16k;
+        proxy_buffers 8 16k;
+        proxy_busy_buffers_size 32k;
     }
 
-    # Health check endpoint
+    # Health check endpoint (for monitoring)
     location /health {
         access_log off;
         return 200 "OK\n";
@@ -64,50 +79,10 @@ server {
     }
 }
 
-# HTTPS server block (optional - for use with Let's Encrypt)
-# Uncomment and configure after obtaining SSL certificate
-# server {
-#     listen 443 ssl http2;
-#     listen [::]:443 ssl http2;
-#     
-#     server_name relay.example.com;
-#     
-#     # SSL certificate (use certbot to obtain)
-#     ssl_certificate /etc/letsencrypt/live/relay.example.com/fullchain.pem;
-#     ssl_certificate_key /etc/letsencrypt/live/relay.example.com/privkey.pem;
-#     
-#     # SSL settings
-#     ssl_protocols TLSv1.2 TLSv1.3;
-#     ssl_ciphers HIGH:!aNULL:!MD5;
-#     ssl_prefer_server_ciphers on;
-#     
-#     # Logging
-#     access_log /var/log/nginx/broadcast-relay-access.log;
-#     error_log /var/log/nginx/broadcast-relay-error.log warn;
-#     
-#     # Proxy settings (same as HTTP)
-#     proxy_buffer_size 16k;
-#     proxy_buffers 8 16k;
-#     proxy_busy_buffers_size 32k;
-#     
-#     location / {
-#         proxy_pass http://broadcast_relay;
-#         proxy_http_version 1.1;
-#         proxy_set_header Upgrade $http_upgrade;
-#         proxy_set_header Connection "upgrade";
-#         proxy_set_header Host $host;
-#         proxy_set_header X-Real-IP $remote_addr;
-#         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-#         proxy_set_header X-Forwarded-Proto $scheme;
-#         proxy_connect_timeout 7d;
-#         proxy_send_timeout 7d;
-#         proxy_read_timeout 7d;
-#         proxy_buffering off;
-#     }
-#     
-#     location /health {
-#         access_log off;
-#         return 200 "OK\n";
-#         add_header Content-Type text/plain;
-#     }
-# }
+# Note: HTTPS/SSL configuration will be automatically added by certbot
+# Run: sudo certbot --nginx -d relay.example.com
+# Certbot will:
+#   - Obtain Let's Encrypt certificate
+#   - Add HTTPS server block
+#   - Configure automatic renewal
+#   - Set up HTTP to HTTPS redirect
