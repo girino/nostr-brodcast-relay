@@ -8,24 +8,24 @@ import (
 )
 
 type Config struct {
-	SeedRelays           []string
-	TopNRelays           int
-	RelayPort            string
-	RefreshInterval      time.Duration
-	HealthCheckInterval  time.Duration
-	InitialTimeout       time.Duration
-	SuccessRateDecay     float64
+	SeedRelays          []string
+	TopNRelays          int
+	RelayPort           string
+	RefreshInterval     time.Duration
+	HealthCheckInterval time.Duration
+	InitialTimeout      time.Duration
+	SuccessRateDecay    float64
 }
 
 func Load() *Config {
 	return &Config{
-		SeedRelays:           parseSeedRelays(getEnv("SEED_RELAYS", "")),
-		TopNRelays:           getEnvInt("TOP_N_RELAYS", 50),
-		RelayPort:            getEnv("RELAY_PORT", "3334"),
-		RefreshInterval:      getEnvDuration("REFRESH_INTERVAL", 24*time.Hour),
-		HealthCheckInterval:  getEnvDuration("HEALTH_CHECK_INTERVAL", 5*time.Minute),
-		InitialTimeout:       getEnvDuration("INITIAL_TIMEOUT", 5*time.Second),
-		SuccessRateDecay:     getEnvFloat("SUCCESS_RATE_DECAY", 0.95),
+		SeedRelays:          parseSeedRelays(getEnv("SEED_RELAYS", "")),
+		TopNRelays:          getEnvInt("TOP_N_RELAYS", 50),
+		RelayPort:           getEnv("RELAY_PORT", "3334"),
+		RefreshInterval:     getEnvDuration("REFRESH_INTERVAL", 24*time.Hour),
+		HealthCheckInterval: getEnvDuration("HEALTH_CHECK_INTERVAL", 5*time.Minute),
+		InitialTimeout:      getEnvDuration("INITIAL_TIMEOUT", 5*time.Second),
+		SuccessRateDecay:    getEnvFloat("SUCCESS_RATE_DECAY", 0.95),
 	}
 }
 
@@ -67,17 +67,16 @@ func parseSeedRelays(seedStr string) []string {
 	if seedStr == "" {
 		return []string{}
 	}
-	
+
 	relays := strings.Split(seedStr, ",")
 	result := make([]string, 0, len(relays))
-	
+
 	for _, relay := range relays {
 		relay = strings.TrimSpace(relay)
 		if relay != "" {
 			result = append(result, relay)
 		}
 	}
-	
+
 	return result
 }
-

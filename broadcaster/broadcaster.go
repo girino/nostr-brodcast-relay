@@ -17,6 +17,7 @@ type Broadcaster struct {
 }
 
 func NewBroadcaster(mgr *manager.Manager, checker *health.Checker) *Broadcaster {
+	log.Println("[BROADCASTER] Initializing broadcaster")
 	return &Broadcaster{
 		manager: mgr,
 		checker: checker,
@@ -28,45 +29,62 @@ func (b *Broadcaster) Broadcast(event *nostr.Event) {
 	topRelays := b.manager.GetTopRelays()
 	
 	if len(topRelays) == 0 {
-		log.Println("Warning: No relays available for broadcasting")
+		log.Printf("[BROADCASTER] WARNING: No relays available for broadcasting event %s (kind %d)", event.ID, event.Kind)
 		return
 	}
 
-	log.Printf("Broadcasting event %s to %d relays", event.ID, len(topRelays))
+	log.Printf("[BROADCASTER] ======================================")
+	log.Printf("[BROADCASTER] Broadcasting event %s (kind %d) to %d relays", event.ID, event.Kind, len(topRelays))
+	log.Printf("[BROADCASTER] Event author: %s", event.PubKey[:16]+"...")
+	log.Printf("[BROADCASTER] Event content length: %d bytes", len(event.Content))
 
 	var wg sync.WaitGroup
+	successCount := 0
+	failCount := 0
+	var mu sync.Mutex
 	
 	for _, relayInfo := range topRelays {
 		wg.Add(1)
 		go func(url string) {
 			defer wg.Done()
-			b.publishToRelay(url, event)
+			success := b.publishToRelay(url, event)
+			mu.Lock()
+			if success {
+				successCount++
+			} else {
+				failCount++
+			}
+			mu.Unlock()
 		}(relayInfo.URL)
 	}
 
-	// Don't wait for completion - fire and forget
-	// But track in background
+	// Track results in background
 	go func() {
 		wg.Wait()
+		log.Printf("[BROADCASTER] Broadcast complete for event %s | success=%d, failed=%d, total=%d", 
+			event.ID, successCount, failCount, len(topRelays))
 	}()
 }
 
 // publishToRelay publishes an event to a single relay and tracks the result
-func (b *Broadcaster) publishToRelay(url string, event *nostr.Event) {
+func (b *Broadcaster) publishToRelay(url string, event *nostr.Event) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	start := time.Now()
 	
+	log.Printf("[BROADCASTER] Publishing to %s...", url)
+	
 	relay, err := nostr.RelayConnect(ctx, url)
 	if err != nil {
+		log.Printf("[BROADCASTER] FAILED to connect to %s: %v", url, err)
 		b.checker.TrackPublishResult(health.PublishResult{
 			URL:          url,
 			Success:      false,
 			ResponseTime: 0,
 			Error:        err,
 		})
-		return
+		return false
 	}
 	defer relay.Close()
 
@@ -83,8 +101,14 @@ func (b *Broadcaster) publishToRelay(url string, event *nostr.Event) {
 	})
 
 	if success {
-		log.Printf("Published event %s to %s (%.2fms)", event.ID, url, elapsed.Seconds()*1000)
+		log.Printf("[BROADCASTER] SUCCESS: Published event %s to %s (%.2fms)", 
+			event.ID, url, elapsed.Seconds()*1000)
+	} else {
+		log.Printf("[BROADCASTER] FAILED to publish to %s: %v (%.2fms)", 
+			url, err, elapsed.Seconds()*1000)
 	}
+	
+	return success
 }
 
 // GetStats returns current broadcast statistics
@@ -93,9 +117,9 @@ func (b *Broadcaster) GetStats() map[string]interface{} {
 	totalRelays := b.manager.GetRelayCount()
 
 	stats := map[string]interface{}{
-		"total_relays":       totalRelays,
-		"active_relays":      len(topRelays),
-		"top_relays":         make([]map[string]interface{}, 0, len(topRelays)),
+		"total_relays":  totalRelays,
+		"active_relays": len(topRelays),
+		"top_relays":    make([]map[string]interface{}, 0, len(topRelays)),
 	}
 
 	for i, relay := range topRelays {
@@ -113,4 +137,3 @@ func (b *Broadcaster) GetStats() map[string]interface{} {
 
 	return stats
 }
-

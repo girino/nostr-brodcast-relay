@@ -18,6 +18,7 @@ type Discovery struct {
 }
 
 func NewDiscovery(mgr *manager.Manager, checker *health.Checker) *Discovery {
+	log.Println("[DISCOVERY] Initializing discovery module")
 	return &Discovery{
 		manager: mgr,
 		checker: checker,
@@ -26,22 +27,27 @@ func NewDiscovery(mgr *manager.Manager, checker *health.Checker) *Discovery {
 
 // DiscoverFromSeeds performs initial relay discovery from seed relays
 func (d *Discovery) DiscoverFromSeeds(ctx context.Context, seedRelays []string) {
-	log.Printf("Starting discovery from %d seed relays", len(seedRelays))
+	log.Printf("[DISCOVERY] ========== Starting seed discovery ==========")
+	log.Printf("[DISCOVERY] Using %d seed relays", len(seedRelays))
 
 	// First, add seed relays to manager
 	for _, seed := range seedRelays {
+		log.Printf("[DISCOVERY] Adding seed relay: %s", seed)
 		d.manager.AddRelay(seed)
 	}
 
 	// Discover more relays from seeds
 	relayURLs := make(map[string]bool)
 	
-	for _, seedURL := range seedRelays {
+	for i, seedURL := range seedRelays {
+		log.Printf("[DISCOVERY] Fetching relay lists from seed %d/%d: %s", i+1, len(seedRelays), seedURL)
 		relays := d.fetchRelaysFromRelay(ctx, seedURL)
 		for _, relay := range relays {
 			relayURLs[relay] = true
 		}
 	}
+
+	log.Printf("[DISCOVERY] Found %d unique relay URLs from seeds", len(relayURLs))
 
 	// Add discovered relays
 	newRelays := []string{}
@@ -52,11 +58,14 @@ func (d *Discovery) DiscoverFromSeeds(ctx context.Context, seedRelays []string) 
 		}
 	}
 
-	log.Printf("Discovered %d new relays from seeds", len(newRelays))
+	log.Printf("[DISCOVERY] Added %d new relays (skipped %d duplicates)", len(newRelays), len(relayURLs)-len(newRelays))
 	
 	// Test all relays (seeds + discovered)
 	allRelays := d.manager.GetAllRelays()
+	log.Printf("[DISCOVERY] Testing all %d relays...", len(allRelays))
 	d.checker.CheckBatch(allRelays)
+	
+	log.Printf("[DISCOVERY] ========== Seed discovery complete ==========")
 }
 
 // fetchRelaysFromRelay fetches relay lists from a specific relay
@@ -218,6 +227,7 @@ func (d *Discovery) AddRelayIfNew(url string) {
 	}
 
 	if !d.isAlreadyKnown(url) {
+		log.Printf("[DISCOVERY] New relay discovered: %s (testing...)", url)
 		d.manager.AddRelay(url)
 		// Test the new relay
 		go d.checker.CheckInitial(url)

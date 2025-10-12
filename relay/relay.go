@@ -99,15 +99,16 @@ func (r *Relay) setupRelay() {
 }
 
 func (r *Relay) handleEvent(event *nostr.Event) {
+	log.Printf("[RELAY] Received event: id=%s, kind=%d, author=%s", event.ID, event.Kind, event.PubKey[:16]+"...")
+	
 	// Extract relay URLs from the event (works for all event kinds)
 	relays := r.discovery.ExtractRelaysFromEvent(event)
 
-	for _, relayURL := range relays {
-		r.discovery.AddRelayIfNew(relayURL)
-	}
-
 	if len(relays) > 0 {
-		log.Printf("Extracted %d relay URLs from event %s (kind %d)", len(relays), event.ID, event.Kind)
+		log.Printf("[RELAY] Extracted %d relay URLs from event %s (kind %d)", len(relays), event.ID, event.Kind)
+		for _, relayURL := range relays {
+			r.discovery.AddRelayIfNew(relayURL)
+		}
 	}
 
 	// Broadcast the event to top N relays

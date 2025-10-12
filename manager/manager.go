@@ -25,6 +25,7 @@ type Manager struct {
 }
 
 func NewManager(topN int, decay float64) *Manager {
+	log.Printf("[MANAGER] Initializing manager: topN=%d, decay=%.2f", topN, decay)
 	return &Manager{
 		relays:      make(map[string]*RelayInfo),
 		decay:       decay,
@@ -47,7 +48,9 @@ func (m *Manager) AddRelay(url string) {
 			SuccessfulAttempts: 0,
 			LastChecked:        time.Now(),
 		}
-		log.Printf("Added new relay: %s", url)
+		log.Printf("[MANAGER] Added new relay: %s (total relays: %d)", url, len(m.relays))
+	} else {
+		log.Printf("[MANAGER] Relay already exists: %s", url)
 	}
 }
 
@@ -58,14 +61,18 @@ func (m *Manager) UpdateHealth(url string, success bool, responseTime time.Durat
 
 	relay, exists := m.relays[url]
 	if !exists {
+		log.Printf("[MANAGER] UpdateHealth called for unknown relay: %s", url)
 		return
 	}
 
+	oldSuccessRate := relay.SuccessRate
 	relay.TotalAttempts++
+	
 	if success {
 		relay.SuccessfulAttempts++
-		
+
 		// Update average response time using exponential moving average
+		oldAvgTime := relay.AvgResponseTime
 		if relay.AvgResponseTime == 0 {
 			relay.AvgResponseTime = responseTime
 		} else {
@@ -73,6 +80,13 @@ func (m *Manager) UpdateHealth(url string, success bool, responseTime time.Durat
 				float64(relay.AvgResponseTime)*0.7 + float64(responseTime)*0.3,
 			)
 		}
+		
+		log.Printf("[MANAGER] Health update SUCCESS: %s | attempts=%d/%d | responseTime=%.2fms (avg: %.2fms->%.2fms)", 
+			url, relay.SuccessfulAttempts, relay.TotalAttempts, 
+			responseTime.Seconds()*1000, oldAvgTime.Seconds()*1000, relay.AvgResponseTime.Seconds()*1000)
+	} else {
+		log.Printf("[MANAGER] Health update FAILED: %s | attempts=%d/%d", 
+			url, relay.SuccessfulAttempts, relay.TotalAttempts)
 	}
 
 	relay.LastChecked = time.Now()
@@ -84,10 +98,14 @@ func (m *Manager) UpdateHealth(url string, success bool, responseTime time.Durat
 			successValue = 1.0
 		}
 		relay.SuccessRate = relay.SuccessRate*m.decay + successValue*(1-m.decay)
+		log.Printf("[MANAGER] Success rate updated (exponential decay): %s | %.4f -> %.4f", 
+			url, oldSuccessRate, relay.SuccessRate)
 	} else {
 		// During initialization, use simple success rate
 		if relay.TotalAttempts > 0 {
 			relay.SuccessRate = float64(relay.SuccessfulAttempts) / float64(relay.TotalAttempts)
+			log.Printf("[MANAGER] Success rate updated (simple): %s | %.4f -> %.4f", 
+				url, oldSuccessRate, relay.SuccessRate)
 		}
 	}
 }
@@ -97,7 +115,9 @@ func (m *Manager) MarkInitialized() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.initialized = true
-	log.Println("Manager initialized, switching to exponential decay mode")
+	log.Printf("[MANAGER] ============ INITIALIZATION COMPLETE ============")
+	log.Printf("[MANAGER] Switching to exponential decay mode (decay=%.2f)", m.decay)
+	log.Printf("[MANAGER] Total relays in pool: %d", len(m.relays))
 }
 
 // GetTopRelays returns the top N relays based on composite score
@@ -106,12 +126,17 @@ func (m *Manager) GetTopRelays() []*RelayInfo {
 	defer m.mu.RUnlock()
 
 	relays := make([]*RelayInfo, 0, len(m.relays))
+	untested := 0
 	for _, relay := range m.relays {
 		// Only include relays that have been tested at least once
 		if relay.TotalAttempts > 0 {
 			relays = append(relays, relay)
+		} else {
+			untested++
 		}
 	}
+
+	log.Printf("[MANAGER] GetTopRelays: %d tested relays, %d untested", len(relays), untested)
 
 	// Sort by composite score
 	sort.Slice(relays, func(i, j int) bool {
@@ -120,10 +145,24 @@ func (m *Manager) GetTopRelays() []*RelayInfo {
 		return scoreI > scoreJ
 	})
 
+	// Log top 5 for visibility
+	logCount := 5
+	if len(relays) < logCount {
+		logCount = len(relays)
+	}
+	for i := 0; i < logCount; i++ {
+		r := relays[i]
+		score := m.calculateScore(r)
+		log.Printf("[MANAGER]   Top #%d: %s | score=%.2f | success=%.2f%% | avg_time=%.2fms | attempts=%d",
+			i+1, r.URL, score, r.SuccessRate*100, r.AvgResponseTime.Seconds()*1000, r.TotalAttempts)
+	}
+
 	// Return top N
 	if len(relays) > m.topN {
+		log.Printf("[MANAGER] Returning top %d out of %d tested relays", m.topN, len(relays))
 		return relays[:m.topN]
 	}
+	log.Printf("[MANAGER] Returning all %d tested relays (less than topN=%d)", len(relays), m.topN)
 	return relays
 }
 
@@ -132,20 +171,20 @@ func (m *Manager) GetTopRelays() []*RelayInfo {
 func (m *Manager) calculateScore(relay *RelayInfo) float64 {
 	// Success rate weight
 	successWeight := 100.0
-	
+
 	// Response time penalty (convert to seconds, higher response time = lower score)
 	responseTimePenalty := 0.0
 	if relay.AvgResponseTime > 0 {
 		responseTimePenalty = relay.AvgResponseTime.Seconds() * 10.0
 	}
-	
+
 	score := relay.SuccessRate*successWeight - responseTimePenalty
-	
+
 	// Penalize relays with very few attempts during initialization
 	if !m.initialized && relay.TotalAttempts < 3 {
 		score *= 0.5
 	}
-	
+
 	return score
 }
 
@@ -172,7 +211,7 @@ func (m *Manager) GetRelayCount() int {
 func (m *Manager) RemoveRelay(url string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	delete(m.relays, url)
 	log.Printf("Removed relay: %s", url)
 }
@@ -181,7 +220,7 @@ func (m *Manager) RemoveRelay(url string) {
 func (m *Manager) GetRelayInfo(url string) *RelayInfo {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	if relay, exists := m.relays[url]; exists {
 		// Return a copy
 		relayCopy := *relay
@@ -189,4 +228,3 @@ func (m *Manager) GetRelayInfo(url string) *RelayInfo {
 	}
 	return nil
 }
-
