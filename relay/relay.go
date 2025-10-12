@@ -58,6 +58,13 @@ func (r *Relay) setupRelay() {
 		},
 	)
 
+	// Handle ephemeral events (kinds 20000-29999)
+	relay.OnEphemeralEvent = append(relay.OnEphemeralEvent,
+		func(ctx context.Context, event *nostr.Event) {
+			r.handleEphemeralEvent(event)
+		},
+	)
+
 	// Don't store events - override the store handler
 	relay.StoreEvent = append(relay.StoreEvent,
 		func(ctx context.Context, event *nostr.Event) error {
@@ -94,7 +101,7 @@ func (r *Relay) setupRelay() {
 func (r *Relay) handleEvent(event *nostr.Event) {
 	// Extract relay URLs from the event
 	relays := r.discovery.ExtractRelaysFromEvent(event)
-	
+
 	for _, relayURL := range relays {
 		r.discovery.AddRelayIfNew(relayURL)
 	}
@@ -107,10 +114,27 @@ func (r *Relay) handleEvent(event *nostr.Event) {
 	r.broadcaster.Broadcast(event)
 }
 
+func (r *Relay) handleEphemeralEvent(event *nostr.Event) {
+	// Extract relay URLs from ephemeral events for discovery
+	relays := r.discovery.ExtractRelaysFromEvent(event)
+
+	for _, relayURL := range relays {
+		r.discovery.AddRelayIfNew(relayURL)
+	}
+
+	if len(relays) > 0 {
+		log.Printf("Extracted %d relay URLs from ephemeral event %s (kind %d)", len(relays), event.ID, event.Kind)
+	}
+
+	// Do NOT broadcast ephemeral events to other relays
+	// Ephemeral events are meant for real-time delivery to connected clients only
+	log.Printf("Received ephemeral event %s (kind %d) - not broadcasting", event.ID, event.Kind)
+}
+
 // Start starts the relay server
 func (r *Relay) Start() error {
 	mux := http.NewServeMux()
-	
+
 	// Mount the relay
 	mux.Handle("/", r.khatru)
 
@@ -119,13 +143,13 @@ func (r *Relay) Start() error {
 		stats := r.broadcaster.GetStats()
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		
+
 		// Simple JSON formatting
 		fmt.Fprintf(w, "{\n")
 		fmt.Fprintf(w, "  \"total_relays\": %d,\n", stats["total_relays"])
 		fmt.Fprintf(w, "  \"active_relays\": %d,\n", stats["active_relays"])
 		fmt.Fprintf(w, "  \"top_relays\": [\n")
-		
+
 		topRelays := stats["top_relays"].([]map[string]interface{})
 		for i, relay := range topRelays {
 			fmt.Fprintf(w, "    {\n")
@@ -139,7 +163,7 @@ func (r *Relay) Start() error {
 				fmt.Fprintf(w, "    }\n")
 			}
 		}
-		
+
 		fmt.Fprintf(w, "  ]\n")
 		fmt.Fprintf(w, "}\n")
 	})
@@ -148,7 +172,6 @@ func (r *Relay) Start() error {
 	log.Printf("Starting relay server on %s", addr)
 	log.Printf("WebSocket: ws://localhost:%s", r.port)
 	log.Printf("Stats: http://localhost:%s/stats", r.port)
-	
+
 	return http.ListenAndServe(addr, mux)
 }
-

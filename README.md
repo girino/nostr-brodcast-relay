@@ -237,6 +237,13 @@ broadcast-relay/
 3. **Performance**: Always use the fastest relays
 4. **Discovery**: Help clients discover new, high-quality relays
 
+## Ephemeral Events
+
+Ephemeral events (kinds 20000-29999) are handled specially:
+- **Processed for discovery**: Relay hints are extracted from ephemeral events
+- **NOT broadcasted**: Ephemeral events are meant for real-time delivery only and are not forwarded to other relays
+- This preserves bandwidth and respects the ephemeral nature of these events
+
 ## Limitations
 
 - No event storage (by design)
