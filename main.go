@@ -45,6 +45,7 @@ func main() {
 	}
 	logging.Info("  - Top N relays: %d", cfg.TopNRelays)
 	logging.Info("  - Relay port: %s", cfg.RelayPort)
+	logging.Info("  - Worker count: %d", cfg.WorkerCount)
 	logging.Debug("  - Refresh interval: %v", cfg.RefreshInterval)
 	logging.Debug("  - Health check interval: %v", cfg.HealthCheckInterval)
 	logging.Debug("  - Initial timeout: %v", cfg.InitialTimeout)
@@ -56,7 +57,7 @@ func main() {
 	mgr := manager.NewManager(cfg.TopNRelays, cfg.SuccessRateDecay)
 	checker := health.NewChecker(mgr, cfg.InitialTimeout)
 	disc := discovery.NewDiscovery(mgr, checker)
-	bc := broadcaster.NewBroadcaster(mgr, checker, cfg.MandatoryRelays)
+	bc := broadcaster.NewBroadcaster(mgr, checker, cfg.MandatoryRelays, cfg.WorkerCount)
 	logging.Info("")
 
 	// Initial relay discovery and testing
@@ -86,6 +87,10 @@ func main() {
 	// Start periodic refresh
 	logging.Info("Starting periodic refresh background task...")
 	go startPeriodicRefresh(ctx, cfg, disc, mgr)
+
+	// Start the broadcaster worker pool
+	logging.Info("Starting broadcaster worker pool...")
+	bc.Start()
 
 	// Start the relay server
 	logging.Info("")
@@ -119,6 +124,9 @@ func main() {
 	logging.Info("==============================================================")
 	logging.Info("=== SHUTTING DOWN GRACEFULLY ===")
 	logging.Info("==============================================================")
+
+	// Stop the broadcaster worker pool
+	bc.Stop()
 
 	// Print final stats
 	stats := bc.GetStats()

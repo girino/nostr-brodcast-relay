@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -16,9 +17,15 @@ type Config struct {
 	HealthCheckInterval time.Duration
 	InitialTimeout      time.Duration
 	SuccessRateDecay    float64
+	WorkerCount         int
 }
 
 func Load() *Config {
+	workerCount := getEnvInt("WORKER_COUNT", 0)
+	if workerCount <= 0 {
+		workerCount = runtime.NumCPU() * 2
+	}
+
 	return &Config{
 		SeedRelays:          parseSeedRelays(getEnv("SEED_RELAYS", "ws://localhost:10547")),
 		MandatoryRelays:     parseSeedRelays(getEnv("MANDATORY_RELAYS", "")),
@@ -28,6 +35,7 @@ func Load() *Config {
 		HealthCheckInterval: getEnvDuration("HEALTH_CHECK_INTERVAL", 5*time.Minute),
 		InitialTimeout:      getEnvDuration("INITIAL_TIMEOUT", 5*time.Second),
 		SuccessRateDecay:    getEnvFloat("SUCCESS_RATE_DECAY", 0.95),
+		WorkerCount:         workerCount,
 	}
 }
 

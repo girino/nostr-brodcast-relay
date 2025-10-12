@@ -15,22 +15,85 @@ type Broadcaster struct {
 	manager         *manager.Manager
 	checker         *health.Checker
 	mandatoryRelays []string
+	eventQueue      chan *nostr.Event
+	workerCount     int
+	ctx             context.Context
+	cancel          context.CancelFunc
+	wg              sync.WaitGroup
 }
 
-func NewBroadcaster(mgr *manager.Manager, checker *health.Checker, mandatoryRelays []string) *Broadcaster {
-	logging.Debug("Broadcaster: Initializing broadcaster")
+func NewBroadcaster(mgr *manager.Manager, checker *health.Checker, mandatoryRelays []string, workerCount int) *Broadcaster {
+	logging.Debug("Broadcaster: Initializing broadcaster with %d workers", workerCount)
 	if len(mandatoryRelays) > 0 {
 		logging.Info("Broadcaster: Configured with %d mandatory relays", len(mandatoryRelays))
 	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+
 	return &Broadcaster{
 		manager:         mgr,
 		checker:         checker,
 		mandatoryRelays: mandatoryRelays,
+		eventQueue:      make(chan *nostr.Event, 10000), // Large buffer, effectively unbounded
+		workerCount:     workerCount,
+		ctx:             ctx,
+		cancel:          cancel,
 	}
 }
 
-// Broadcast sends an event to the top N relays concurrently
+// Start initializes and starts the worker pool
+func (b *Broadcaster) Start() {
+	logging.Info("Broadcaster: Starting %d workers", b.workerCount)
+	for i := 0; i < b.workerCount; i++ {
+		b.wg.Add(1)
+		go b.worker(i)
+	}
+}
+
+// Stop gracefully shuts down the worker pool
+func (b *Broadcaster) Stop() {
+	logging.Info("Broadcaster: Stopping worker pool")
+	b.cancel()
+	close(b.eventQueue)
+	b.wg.Wait()
+	logging.Info("Broadcaster: All workers stopped")
+}
+
+// worker processes events from the queue
+func (b *Broadcaster) worker(id int) {
+	defer b.wg.Done()
+	logging.Debug("Broadcaster: Worker %d started", id)
+
+	for {
+		select {
+		case <-b.ctx.Done():
+			logging.Debug("Broadcaster: Worker %d shutting down (context cancelled)", id)
+			return
+		case event, ok := <-b.eventQueue:
+			if !ok {
+				logging.Debug("Broadcaster: Worker %d shutting down (queue closed)", id)
+				return
+			}
+			b.broadcastEvent(event)
+		}
+	}
+}
+
+// Broadcast enqueues an event for broadcasting
 func (b *Broadcaster) Broadcast(event *nostr.Event) {
+	select {
+	case b.eventQueue <- event:
+		logging.Debug("Broadcaster: Event %s (kind %d) queued for broadcast", event.ID, event.Kind)
+	case <-b.ctx.Done():
+		logging.Warn("Broadcaster: Cannot queue event %s, broadcaster is shutting down", event.ID)
+	default:
+		// Queue is full, log warning but don't block
+		logging.Warn("Broadcaster: Event queue is full, dropping event %s (kind %d)", event.ID, event.Kind)
+	}
+}
+
+// broadcastEvent sends an event to the top N relays concurrently
+func (b *Broadcaster) broadcastEvent(event *nostr.Event) {
 	topRelays := b.manager.GetTopRelays()
 
 	// Build complete relay list: mandatory + top N
