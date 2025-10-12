@@ -26,7 +26,7 @@ func NewChecker(mgr *manager.Manager, initialTimeout time.Duration) *Checker {
 // CheckInitial performs initial timeout-based health check on a relay
 func (c *Checker) CheckInitial(url string) bool {
 	logging.Debug("Health: Testing relay: %s", url)
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), c.initialTimeout)
 	defer cancel()
 
@@ -41,7 +41,7 @@ func (c *Checker) CheckInitial(url string) bool {
 	defer relay.Close()
 
 	elapsed := time.Since(start)
-	
+
 	// Consider it successful if we connected
 	c.manager.UpdateHealth(url, true, elapsed)
 	logging.Debug("Health: Connected successfully to %s | time=%.2fms", url, elapsed.Seconds()*1000)
@@ -51,7 +51,7 @@ func (c *Checker) CheckInitial(url string) bool {
 // CheckBatch performs initial checks on multiple relays concurrently
 func (c *Checker) CheckBatch(urls []string) {
 	logging.Debug("Health: Starting batch health check of %d relays (max 20 concurrent)", len(urls))
-	
+
 	sem := make(chan struct{}, 20) // Limit concurrent checks
 	var wg sync.WaitGroup
 	successCount := 0
@@ -59,14 +59,14 @@ func (c *Checker) CheckBatch(urls []string) {
 	var mu sync.Mutex
 
 	start := time.Now()
-	
+
 	for _, url := range urls {
 		wg.Add(1)
 		go func(u string) {
 			defer wg.Done()
 			sem <- struct{}{}        // Acquire semaphore
 			defer func() { <-sem }() // Release semaphore
-			
+
 			success := c.CheckInitial(u)
 			mu.Lock()
 			if success {
@@ -80,9 +80,9 @@ func (c *Checker) CheckBatch(urls []string) {
 
 	wg.Wait()
 	elapsed := time.Since(start)
-	
+
 	// Always log the summary
-	logging.Info("Health: Batch check complete - %d success, %d failed out of %d total (%.2fs)", 
+	logging.Info("Health: Batch check complete - %d success, %d failed out of %d total (%.2fs)",
 		successCount, failCount, len(urls), elapsed.Seconds())
 }
 
@@ -97,7 +97,7 @@ type PublishResult struct {
 // TrackPublishResult updates relay health based on publish results
 func (c *Checker) TrackPublishResult(result PublishResult) {
 	c.manager.UpdateHealth(result.URL, result.Success, result.ResponseTime)
-	
+
 	if !result.Success && result.Error != nil {
 		logging.Debug("Health: Publish to %s failed: %v", result.URL, result.Error)
 	}
