@@ -151,6 +151,8 @@ func (b *Broadcaster) addEventToCache(eventID string) {
 	b.cacheMutex.Lock()
 	defer b.cacheMutex.Unlock()
 
+	logging.DebugMethod("broadcaster", "addEventToCache", "Adding event %s to cache (current size: %d)", eventID, len(b.eventCache))
+
 	// Check if cache is at max capacity
 	if len(b.eventCache) >= b.cacheMaxSize {
 		// Clear 20% of the cache to make room (simple cleanup strategy)
@@ -165,6 +167,7 @@ func (b *Broadcaster) addEventToCache(eventID string) {
 			}
 		}
 		logging.Info("Broadcaster: Cache full, removed %d old entries (cache size: %d)", removed, len(b.eventCache))
+		logging.DebugMethod("broadcaster", "addEventToCache", "Cache cleanup complete, removed %d entries", removed)
 	}
 
 	b.eventCache[eventID] = true

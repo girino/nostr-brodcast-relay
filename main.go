@@ -19,9 +19,9 @@ import (
 
 func main() {
 	// Parse command-line flags
-	var verbose bool
-	flag.BoolVar(&verbose, "verbose", false, "Enable verbose logging")
-	flag.BoolVar(&verbose, "v", false, "Enable verbose logging (shorthand)")
+	var verbose string
+	flag.StringVar(&verbose, "verbose", "", "Enable verbose logging. Examples: 'true' (all), 'config,health' (modules), 'broadcaster.addEventToCache' (specific method)")
+	flag.StringVar(&verbose, "v", "", "Enable verbose logging (shorthand)")
 	flag.Parse()
 
 	// Set verbose mode in logging package

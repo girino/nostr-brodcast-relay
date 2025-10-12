@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/girino/broadcast-relay/logging"
 )
 
 type Config struct {
@@ -26,7 +28,7 @@ func Load() *Config {
 		workerCount = runtime.NumCPU() * 2
 	}
 
-	return &Config{
+	cfg := &Config{
 		SeedRelays:          parseSeedRelays(getEnv("SEED_RELAYS", "ws://localhost:10547")),
 		MandatoryRelays:     parseSeedRelays(getEnv("MANDATORY_RELAYS", "")),
 		TopNRelays:          getEnvInt("TOP_N_RELAYS", 50),
@@ -37,6 +39,11 @@ func Load() *Config {
 		SuccessRateDecay:    getEnvFloat("SUCCESS_RATE_DECAY", 0.95),
 		WorkerCount:         workerCount,
 	}
+
+	logging.DebugModule("config", "Loaded configuration: SeedRelays=%d, MandatoryRelays=%d, TopN=%d, Port=%s, Workers=%d",
+		len(cfg.SeedRelays), len(cfg.MandatoryRelays), cfg.TopNRelays, cfg.RelayPort, cfg.WorkerCount)
+
+	return cfg
 }
 
 func getEnv(key, defaultValue string) string {

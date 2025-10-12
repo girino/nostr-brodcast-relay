@@ -1,17 +1,89 @@
 package logging
 
-import "log"
+import (
+	"log"
+	"strings"
+)
 
 var Verbose bool
+var verboseFilters map[string]bool
+var verboseAll bool
 
-// SetVerbose sets the verbose logging mode
-func SetVerbose(verbose bool) {
-	Verbose = verbose
+// SetVerbose sets the verbose logging mode with granular filtering
+// Examples:
+//   - "" or "false": disable all verbose logging
+//   - "true": enable all verbose logging
+//   - "config,health": enable verbose for config and health modules
+//   - "broadcaster.addEventToCache,main": enable broadcaster.addEventToCache method and all of main module
+func SetVerbose(verboseStr string) {
+	verboseFilters = make(map[string]bool)
+	verboseAll = false
+	Verbose = false
+
+	if verboseStr == "" || verboseStr == "false" {
+		return
+	}
+
+	if verboseStr == "true" {
+		Verbose = true
+		verboseAll = true
+		return
+	}
+
+	// Parse comma-separated filters
+	filters := strings.Split(verboseStr, ",")
+	for _, filter := range filters {
+		filter = strings.TrimSpace(filter)
+		if filter != "" {
+			verboseFilters[filter] = true
+			Verbose = true // At least one filter is enabled
+		}
+	}
 }
 
-// Debug logs debug messages (only in verbose mode)
+// IsVerbose checks if verbose logging is enabled for a specific module or method
+func IsVerbose(module string, method string) bool {
+	if !Verbose {
+		return false
+	}
+
+	if verboseAll {
+		return true
+	}
+
+	// Check if module.method is enabled
+	if method != "" {
+		fullName := module + "." + method
+		if verboseFilters[fullName] {
+			return true
+		}
+	}
+
+	// Check if module is enabled (all methods)
+	if verboseFilters[module] {
+		return true
+	}
+
+	return false
+}
+
+// DebugModule logs debug messages for a specific module (only in verbose mode)
+func DebugModule(module string, format string, v ...interface{}) {
+	if IsVerbose(module, "") {
+		log.Printf("[DEBUG] "+module+": "+format, v...)
+	}
+}
+
+// DebugMethod logs debug messages for a specific module.method (only in verbose mode)
+func DebugMethod(module string, method string, format string, v ...interface{}) {
+	if IsVerbose(module, method) {
+		log.Printf("[DEBUG] "+module+"."+method+": "+format, v...)
+	}
+}
+
+// Debug logs debug messages (only in verbose mode) - backward compatibility
 func Debug(format string, v ...interface{}) {
-	if Verbose {
+	if verboseAll {
 		log.Printf("[DEBUG] "+format, v...)
 	}
 }
@@ -34,7 +106,7 @@ func Error(format string, v ...interface{}) {
 // LogV is deprecated, use Debug instead
 // Kept for backward compatibility during migration
 func LogV(format string, v ...interface{}) {
-	if Verbose {
+	if verboseAll {
 		log.Printf(format, v...)
 	}
 }
