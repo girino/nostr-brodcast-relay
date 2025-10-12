@@ -82,7 +82,7 @@ func (b *Broadcaster) Start() {
 		b.wg.Add(1)
 		go b.worker(i)
 	}
-	
+
 	// Start cache cleanup goroutine
 	b.wg.Add(1)
 	go b.cacheCleanup()
@@ -146,19 +146,19 @@ func (b *Broadcaster) backfillChannel() {
 func (b *Broadcaster) isEventCached(eventID string) bool {
 	b.cacheMutex.RLock()
 	defer b.cacheMutex.RUnlock()
-	
+
 	entry, exists := b.eventCache[eventID]
 	if !exists {
 		atomic.AddInt64(&b.cacheMisses, 1)
 		return false
 	}
-	
+
 	// Check if entry has expired
 	if time.Since(entry.timestamp) > b.cacheTTL {
 		atomic.AddInt64(&b.cacheMisses, 1)
 		return false
 	}
-	
+
 	atomic.AddInt64(&b.cacheHits, 1)
 	return true
 }
@@ -171,7 +171,7 @@ func (b *Broadcaster) IsEventCached(eventID string) bool {
 // cacheCleanup periodically removes expired entries from the cache
 func (b *Broadcaster) cacheCleanup() {
 	defer b.wg.Done()
-	
+
 	// Run cleanup every 1/10th of the TTL or every 5 minutes, whichever is less
 	cleanupInterval := b.cacheTTL / 10
 	if cleanupInterval > 5*time.Minute {
@@ -180,12 +180,12 @@ func (b *Broadcaster) cacheCleanup() {
 	if cleanupInterval < 30*time.Second {
 		cleanupInterval = 30 * time.Second
 	}
-	
+
 	ticker := time.NewTicker(cleanupInterval)
 	defer ticker.Stop()
-	
+
 	logging.DebugMethod("broadcaster", "cacheCleanup", "Cache cleanup started, interval: %v", cleanupInterval)
-	
+
 	for {
 		select {
 		case <-b.ctx.Done():
@@ -202,7 +202,7 @@ func (b *Broadcaster) cacheCleanup() {
 				}
 			}
 			b.cacheMutex.Unlock()
-			
+
 			if removed > 0 {
 				logging.DebugMethod("broadcaster", "cacheCleanup", "Removed %d expired entries (cache size: %d)", removed, len(b.eventCache))
 			}
@@ -214,9 +214,9 @@ func (b *Broadcaster) cacheCleanup() {
 func (b *Broadcaster) addEventToCache(eventID string) {
 	b.cacheMutex.Lock()
 	defer b.cacheMutex.Unlock()
-	
+
 	logging.DebugMethod("broadcaster", "addEventToCache", "Adding event %s to cache (current size: %d)", eventID, len(b.eventCache))
-	
+
 	// Check if cache is at max capacity
 	if len(b.eventCache) >= b.cacheMaxSize {
 		// Clear 20% of the oldest entries
@@ -232,7 +232,7 @@ func (b *Broadcaster) addEventToCache(eventID string) {
 		logging.Info("Broadcaster: Cache full, removed %d old entries (cache size: %d)", removed, len(b.eventCache))
 		logging.DebugMethod("broadcaster", "addEventToCache", "Cache cleanup complete, removed %d entries", removed)
 	}
-	
+
 	b.eventCache[eventID] = cacheEntry{
 		timestamp: time.Now(),
 	}
