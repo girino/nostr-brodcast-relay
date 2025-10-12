@@ -20,6 +20,7 @@ type Config struct {
 	InitialTimeout      time.Duration
 	SuccessRateDecay    float64
 	WorkerCount         int
+	CacheTTL            time.Duration
 }
 
 func Load() *Config {
@@ -38,6 +39,7 @@ func Load() *Config {
 		InitialTimeout:      getEnvDuration("INITIAL_TIMEOUT", 5*time.Second),
 		SuccessRateDecay:    getEnvFloat("SUCCESS_RATE_DECAY", 0.95),
 		WorkerCount:         workerCount,
+		CacheTTL:            getEnvDuration("CACHE_TTL", 24*time.Hour),
 	}
 
 	logging.DebugMethod("config", "Load", "Loaded configuration: SeedRelays=%d, MandatoryRelays=%d, TopN=%d, Port=%s, Workers=%d",

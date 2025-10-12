@@ -12,6 +12,10 @@ import (
 	"github.com/nbd-wtf/go-nostr"
 )
 
+type cacheEntry struct {
+	timestamp time.Time
+}
+
 type Broadcaster struct {
 	manager         *manager.Manager
 	checker         *health.Checker
@@ -29,14 +33,15 @@ type Broadcaster struct {
 	cancel          context.CancelFunc
 	wg              sync.WaitGroup
 	// Event deduplication cache
-	eventCache   map[string]bool
+	eventCache   map[string]cacheEntry
 	cacheMutex   sync.RWMutex
 	cacheMaxSize int
+	cacheTTL     time.Duration
 	cacheHits    int64
 	cacheMisses  int64
 }
 
-func NewBroadcaster(mgr *manager.Manager, checker *health.Checker, mandatoryRelays []string, workerCount int) *Broadcaster {
+func NewBroadcaster(mgr *manager.Manager, checker *health.Checker, mandatoryRelays []string, workerCount int, cacheTTL time.Duration) *Broadcaster {
 	logging.DebugMethod("broadcaster", "NewBroadcaster", "Initializing broadcaster with %d workers", workerCount)
 	if len(mandatoryRelays) > 0 {
 		logging.Info("Broadcaster: Configured with %d mandatory relays", len(mandatoryRelays))
@@ -47,7 +52,7 @@ func NewBroadcaster(mgr *manager.Manager, checker *health.Checker, mandatoryRela
 	cacheMaxSize := 100000 // ~10MB: 100K event IDs @ ~100 bytes each
 
 	logging.Info("Broadcaster: Channel capacity set to %d (10 * %d workers)", channelCapacity, workerCount)
-	logging.Info("Broadcaster: Event cache initialized with max size %d (~10MB)", cacheMaxSize)
+	logging.Info("Broadcaster: Event cache initialized with max size %d (~10MB), TTL %v", cacheMaxSize, cacheTTL)
 
 	return &Broadcaster{
 		manager:         mgr,
@@ -62,8 +67,9 @@ func NewBroadcaster(mgr *manager.Manager, checker *health.Checker, mandatoryRela
 		workerCount:     workerCount,
 		ctx:             ctx,
 		cancel:          cancel,
-		eventCache:      make(map[string]bool),
+		eventCache:      make(map[string]cacheEntry),
 		cacheMaxSize:    cacheMaxSize,
+		cacheTTL:        cacheTTL,
 		cacheHits:       0,
 		cacheMisses:     0,
 	}
@@ -76,6 +82,10 @@ func (b *Broadcaster) Start() {
 		b.wg.Add(1)
 		go b.worker(i)
 	}
+	
+	// Start cache cleanup goroutine
+	b.wg.Add(1)
+	go b.cacheCleanup()
 }
 
 // Stop gracefully shuts down the worker pool
@@ -132,18 +142,25 @@ func (b *Broadcaster) backfillChannel() {
 	}
 }
 
-// isEventCached checks if an event has already been broadcast
+// isEventCached checks if an event has already been broadcast and not expired
 func (b *Broadcaster) isEventCached(eventID string) bool {
 	b.cacheMutex.RLock()
 	defer b.cacheMutex.RUnlock()
 	
-	_, exists := b.eventCache[eventID]
-	if exists {
-		atomic.AddInt64(&b.cacheHits, 1)
-	} else {
+	entry, exists := b.eventCache[eventID]
+	if !exists {
 		atomic.AddInt64(&b.cacheMisses, 1)
+		return false
 	}
-	return exists
+	
+	// Check if entry has expired
+	if time.Since(entry.timestamp) > b.cacheTTL {
+		atomic.AddInt64(&b.cacheMisses, 1)
+		return false
+	}
+	
+	atomic.AddInt64(&b.cacheHits, 1)
+	return true
 }
 
 // IsEventCached checks if an event ID is in the cache (public method for relay)
@@ -151,17 +168,58 @@ func (b *Broadcaster) IsEventCached(eventID string) bool {
 	return b.isEventCached(eventID)
 }
 
-// addEventToCache adds an event ID to the cache
+// cacheCleanup periodically removes expired entries from the cache
+func (b *Broadcaster) cacheCleanup() {
+	defer b.wg.Done()
+	
+	// Run cleanup every 1/10th of the TTL or every 5 minutes, whichever is less
+	cleanupInterval := b.cacheTTL / 10
+	if cleanupInterval > 5*time.Minute {
+		cleanupInterval = 5 * time.Minute
+	}
+	if cleanupInterval < 30*time.Second {
+		cleanupInterval = 30 * time.Second
+	}
+	
+	ticker := time.NewTicker(cleanupInterval)
+	defer ticker.Stop()
+	
+	logging.DebugMethod("broadcaster", "cacheCleanup", "Cache cleanup started, interval: %v", cleanupInterval)
+	
+	for {
+		select {
+		case <-b.ctx.Done():
+			logging.DebugMethod("broadcaster", "cacheCleanup", "Cache cleanup shutting down")
+			return
+		case <-ticker.C:
+			b.cacheMutex.Lock()
+			now := time.Now()
+			removed := 0
+			for key, entry := range b.eventCache {
+				if now.Sub(entry.timestamp) > b.cacheTTL {
+					delete(b.eventCache, key)
+					removed++
+				}
+			}
+			b.cacheMutex.Unlock()
+			
+			if removed > 0 {
+				logging.DebugMethod("broadcaster", "cacheCleanup", "Removed %d expired entries (cache size: %d)", removed, len(b.eventCache))
+			}
+		}
+	}
+}
+
+// addEventToCache adds an event ID to the cache with current timestamp
 func (b *Broadcaster) addEventToCache(eventID string) {
 	b.cacheMutex.Lock()
 	defer b.cacheMutex.Unlock()
-
+	
 	logging.DebugMethod("broadcaster", "addEventToCache", "Adding event %s to cache (current size: %d)", eventID, len(b.eventCache))
-
+	
 	// Check if cache is at max capacity
 	if len(b.eventCache) >= b.cacheMaxSize {
-		// Clear 20% of the cache to make room (simple cleanup strategy)
-		// In production, you might want LRU eviction instead
+		// Clear 20% of the oldest entries
 		toRemove := b.cacheMaxSize / 5
 		removed := 0
 		for key := range b.eventCache {
@@ -174,8 +232,10 @@ func (b *Broadcaster) addEventToCache(eventID string) {
 		logging.Info("Broadcaster: Cache full, removed %d old entries (cache size: %d)", removed, len(b.eventCache))
 		logging.DebugMethod("broadcaster", "addEventToCache", "Cache cleanup complete, removed %d entries", removed)
 	}
-
-	b.eventCache[eventID] = true
+	
+	b.eventCache[eventID] = cacheEntry{
+		timestamp: time.Now(),
+	}
 }
 
 // Broadcast enqueues an event for broadcasting
@@ -187,7 +247,7 @@ func (b *Broadcaster) Broadcast(event *nostr.Event) {
 		return
 	default:
 	}
-	
+
 	// Add to cache (should not be cached yet since relay rejects duplicates)
 	b.addEventToCache(event.ID)
 

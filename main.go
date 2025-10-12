@@ -46,6 +46,7 @@ func main() {
 	logging.Info("  - Top N relays: %d", cfg.TopNRelays)
 	logging.Info("  - Relay port: %s", cfg.RelayPort)
 	logging.Info("  - Worker count: %d", cfg.WorkerCount)
+	logging.Info("  - Cache TTL: %v", cfg.CacheTTL)
 	logging.Debug("  - Refresh interval: %v", cfg.RefreshInterval)
 	logging.Debug("  - Health check interval: %v", cfg.HealthCheckInterval)
 	logging.Debug("  - Initial timeout: %v", cfg.InitialTimeout)
@@ -57,7 +58,7 @@ func main() {
 	mgr := manager.NewManager(cfg.TopNRelays, cfg.SuccessRateDecay)
 	checker := health.NewChecker(mgr, cfg.InitialTimeout)
 	disc := discovery.NewDiscovery(mgr, checker)
-	bc := broadcaster.NewBroadcaster(mgr, checker, cfg.MandatoryRelays, cfg.WorkerCount)
+	bc := broadcaster.NewBroadcaster(mgr, checker, cfg.MandatoryRelays, cfg.WorkerCount, cfg.CacheTTL)
 	logging.Info("")
 
 	// Add mandatory relays to the manager for tracking
