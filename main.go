@@ -60,6 +60,14 @@ func main() {
 	bc := broadcaster.NewBroadcaster(mgr, checker, cfg.MandatoryRelays, cfg.WorkerCount)
 	logging.Info("")
 
+	// Add mandatory relays to the manager for tracking
+	if len(cfg.MandatoryRelays) > 0 {
+		logging.Info("Adding mandatory relays to manager for tracking...")
+		for _, url := range cfg.MandatoryRelays {
+			mgr.AddMandatoryRelay(url)
+		}
+	}
+
 	// Initial relay discovery and testing
 	logging.Info("========== PHASE 1: DISCOVERY & TESTING ==========")
 	ctx := context.Background()

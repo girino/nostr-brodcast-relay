@@ -281,6 +281,7 @@ func (b *Broadcaster) publishToRelay(url string, event *nostr.Event) bool {
 // GetStats returns current broadcast statistics
 func (b *Broadcaster) GetStats() map[string]interface{} {
 	topRelays := b.manager.GetTopRelays()
+	mandatoryRelays := b.manager.GetMandatoryRelays()
 	totalRelays := b.manager.GetRelayCount()
 
 	// Get queue stats
@@ -296,8 +297,9 @@ func (b *Broadcaster) GetStats() map[string]interface{} {
 	isSaturated := overflowSize > 0
 
 	stats := map[string]interface{}{
-		"total_relays":  totalRelays,
-		"active_relays": len(topRelays),
+		"total_relays":     totalRelays,
+		"active_relays":    len(topRelays),
+		"mandatory_relays": len(mandatoryRelays),
 		"queue": map[string]interface{}{
 			"worker_count":        b.workerCount,
 			"channel_size":        channelSize,
@@ -310,7 +312,21 @@ func (b *Broadcaster) GetStats() map[string]interface{} {
 			"is_saturated":        isSaturated,
 			"last_saturation":     b.lastSaturation,
 		},
-		"top_relays": make([]map[string]interface{}, 0, len(topRelays)),
+		"mandatory_relay_list": make([]map[string]interface{}, 0, len(mandatoryRelays)),
+		"top_relays":           make([]map[string]interface{}, 0, len(topRelays)),
+	}
+
+	// Show mandatory relays
+	for _, relay := range mandatoryRelays {
+		score := b.manager.CalculateScore(relay)
+		relayStats := map[string]interface{}{
+			"url":             relay.URL,
+			"score":           score,
+			"success_rate":    relay.SuccessRate,
+			"avg_response_ms": relay.AvgResponseTime.Milliseconds(),
+			"total_attempts":  relay.TotalAttempts,
+		}
+		stats["mandatory_relay_list"] = append(stats["mandatory_relay_list"].([]map[string]interface{}), relayStats)
 	}
 
 	// Show all active relays

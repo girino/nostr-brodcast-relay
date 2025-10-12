@@ -15,6 +15,7 @@ type RelayInfo struct {
 	TotalAttempts      int64
 	SuccessfulAttempts int64
 	LastChecked        time.Time
+	IsMandatory        bool
 }
 
 type Manager struct {
@@ -48,10 +49,33 @@ func (m *Manager) AddRelay(url string) {
 			TotalAttempts:      0,
 			SuccessfulAttempts: 0,
 			LastChecked:        time.Now(),
+			IsMandatory:        false,
 		}
 		logging.Debug("Manager: Added new relay: %s (total relays: %d)", url, len(m.relays))
 	} else {
 		logging.Debug("Manager: Relay already exists: %s", url)
+	}
+}
+
+// AddMandatoryRelay adds a mandatory relay to the manager
+func (m *Manager) AddMandatoryRelay(url string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if relay, exists := m.relays[url]; exists {
+		relay.IsMandatory = true
+		logging.Debug("Manager: Marked relay as mandatory: %s", url)
+	} else {
+		m.relays[url] = &RelayInfo{
+			URL:                url,
+			AvgResponseTime:    0,
+			SuccessRate:        1.0, // Start optimistic
+			TotalAttempts:      0,
+			SuccessfulAttempts: 0,
+			LastChecked:        time.Now(),
+			IsMandatory:        true,
+		}
+		logging.Debug("Manager: Added new mandatory relay: %s (total relays: %d)", url, len(m.relays))
 	}
 }
 
@@ -232,4 +256,18 @@ func (m *Manager) GetRelayInfo(url string) *RelayInfo {
 		return &relayCopy
 	}
 	return nil
+}
+
+// GetMandatoryRelays returns all mandatory relays
+func (m *Manager) GetMandatoryRelays() []*RelayInfo {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	relays := make([]*RelayInfo, 0)
+	for _, relay := range m.relays {
+		if relay.IsMandatory {
+			relays = append(relays, relay)
+		}
+	}
+	return relays
 }
