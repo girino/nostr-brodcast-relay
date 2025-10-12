@@ -3,6 +3,7 @@ package broadcaster
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/girino/broadcast-relay/health"
@@ -16,6 +17,12 @@ type Broadcaster struct {
 	checker         *health.Checker
 	mandatoryRelays []string
 	eventQueue      chan *nostr.Event
+	queueMutex      sync.RWMutex
+	queueCapacity   int64
+	queueSize       int64
+	peakQueueSize   int64
+	saturationCount int64
+	lastSaturation  time.Time
 	workerCount     int
 	ctx             context.Context
 	cancel          context.CancelFunc
@@ -29,12 +36,17 @@ func NewBroadcaster(mgr *manager.Manager, checker *health.Checker, mandatoryRela
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+	initialCapacity := int64(10000)
 
 	return &Broadcaster{
 		manager:         mgr,
 		checker:         checker,
 		mandatoryRelays: mandatoryRelays,
-		eventQueue:      make(chan *nostr.Event, 10000), // Large buffer, effectively unbounded
+		eventQueue:      make(chan *nostr.Event, initialCapacity),
+		queueCapacity:   initialCapacity,
+		queueSize:       0,
+		peakQueueSize:   0,
+		saturationCount: 0,
 		workerCount:     workerCount,
 		ctx:             ctx,
 		cancel:          cancel,
@@ -69,27 +81,123 @@ func (b *Broadcaster) worker(id int) {
 		case <-b.ctx.Done():
 			logging.Debug("Broadcaster: Worker %d shutting down (context cancelled)", id)
 			return
-		case event, ok := <-b.eventQueue:
+		case event, ok := <-b.getEventQueue():
 			if !ok {
 				logging.Debug("Broadcaster: Worker %d shutting down (queue closed)", id)
 				return
 			}
+			atomic.AddInt64(&b.queueSize, -1)
 			b.broadcastEvent(event)
 		}
 	}
 }
 
+// getEventQueue returns the current event queue with read lock
+func (b *Broadcaster) getEventQueue() <-chan *nostr.Event {
+	b.queueMutex.RLock()
+	defer b.queueMutex.RUnlock()
+	return b.eventQueue
+}
+
 // Broadcast enqueues an event for broadcasting
 func (b *Broadcaster) Broadcast(event *nostr.Event) {
+	// Check if shutting down
 	select {
-	case b.eventQueue <- event:
-		logging.Debug("Broadcaster: Event %s (kind %d) queued for broadcast", event.ID, event.Kind)
 	case <-b.ctx.Done():
 		logging.Warn("Broadcaster: Cannot queue event %s, broadcaster is shutting down", event.ID)
+		return
 	default:
-		// Queue is full, log warning but don't block
-		logging.Warn("Broadcaster: Event queue is full, dropping event %s (kind %d)", event.ID, event.Kind)
 	}
+
+	// Try to enqueue with read lock first
+	b.queueMutex.RLock()
+	queue := b.eventQueue
+	capacity := atomic.LoadInt64(&b.queueCapacity)
+	currentSize := atomic.LoadInt64(&b.queueSize)
+	b.queueMutex.RUnlock()
+
+	select {
+	case queue <- event:
+		// Successfully queued
+		newSize := atomic.AddInt64(&b.queueSize, 1)
+		logging.Debug("Broadcaster: Event %s (kind %d) queued for broadcast (queue: %d/%d)",
+			event.ID, event.Kind, newSize, capacity)
+
+		// Update peak size
+		for {
+			peak := atomic.LoadInt64(&b.peakQueueSize)
+			if newSize <= peak || atomic.CompareAndSwapInt64(&b.peakQueueSize, peak, newSize) {
+				break
+			}
+		}
+		return
+	default:
+		// Queue is full - need to grow it
+		atomic.AddInt64(&b.saturationCount, 1)
+		b.lastSaturation = time.Now()
+
+		// Log warning (throttled)
+		logging.Warn("Broadcaster: Queue saturated at %d/%d events, growing queue...",
+			currentSize, capacity)
+
+		// Grow the queue
+		b.growQueue()
+
+		// Try again with new queue
+		b.queueMutex.RLock()
+		queue = b.eventQueue
+		b.queueMutex.RUnlock()
+
+		select {
+		case queue <- event:
+			newSize := atomic.AddInt64(&b.queueSize, 1)
+			logging.Debug("Broadcaster: Event %s queued after queue growth (queue: %d)", event.ID, newSize)
+		default:
+			// Still full? This shouldn't happen but handle it
+			logging.Error("Broadcaster: Queue still full after growth, dropping event %s (kind %d)",
+				event.ID, event.Kind)
+		}
+	}
+}
+
+// growQueue grows the event queue by 1.25x
+func (b *Broadcaster) growQueue() {
+	b.queueMutex.Lock()
+	defer b.queueMutex.Unlock()
+
+	oldCapacity := atomic.LoadInt64(&b.queueCapacity)
+	newCapacity := int64(float64(oldCapacity) * 1.25)
+	if newCapacity <= oldCapacity {
+		newCapacity = oldCapacity + 1000 // Ensure at least some growth
+	}
+
+	logging.Info("Broadcaster: Growing queue from %d to %d", oldCapacity, newCapacity)
+
+	// Create new queue
+	newQueue := make(chan *nostr.Event, newCapacity)
+
+	// Drain old queue into new queue
+	oldQueue := b.eventQueue
+	drained := 0
+	drainLoop:
+	for {
+		select {
+		case event, ok := <-oldQueue:
+			if !ok {
+				break drainLoop
+			}
+			newQueue <- event
+			drained++
+		default:
+			break drainLoop
+		}
+	}
+
+	logging.Debug("Broadcaster: Drained %d events from old queue to new queue", drained)
+
+	// Swap the queue
+	b.eventQueue = newQueue
+	atomic.StoreInt64(&b.queueCapacity, newCapacity)
 }
 
 // broadcastEvent sends an event to the top N relays concurrently
@@ -199,10 +307,26 @@ func (b *Broadcaster) GetStats() map[string]interface{} {
 	topRelays := b.manager.GetTopRelays()
 	totalRelays := b.manager.GetRelayCount()
 
+	// Get queue stats
+	currentSize := atomic.LoadInt64(&b.queueSize)
+	capacity := atomic.LoadInt64(&b.queueCapacity)
+	peakSize := atomic.LoadInt64(&b.peakQueueSize)
+	saturationCount := atomic.LoadInt64(&b.saturationCount)
+	utilizationPercent := float64(currentSize) / float64(capacity) * 100.0
+
 	stats := map[string]interface{}{
 		"total_relays":  totalRelays,
 		"active_relays": len(topRelays),
-		"top_relays":    make([]map[string]interface{}, 0, len(topRelays)),
+		"queue": map[string]interface{}{
+			"current_size":       currentSize,
+			"capacity":           capacity,
+			"peak_size":          peakSize,
+			"utilization_pct":    utilizationPercent,
+			"saturation_count":   saturationCount,
+			"is_saturated":       currentSize >= capacity,
+			"last_saturation":    b.lastSaturation,
+		},
+		"top_relays": make([]map[string]interface{}, 0, len(topRelays)),
 	}
 
 	// Show all active relays
