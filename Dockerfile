@@ -1,5 +1,6 @@
 # Multi-stage build for broadcast-relay
-FROM golang:1.21-alpine AS builder
+# Use latest Go version to support go.mod requirements
+FROM golang:alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache git ca-certificates tzdata
