@@ -118,11 +118,34 @@ With default settings (uses nak debug relay at `ws://localhost:10547`):
 ./broadcast-relay
 ```
 
+With verbose logging:
+```bash
+./broadcast-relay -v
+# or
+./broadcast-relay --verbose
+```
+
 Or with custom seed relays:
 ```bash
 export SEED_RELAYS="wss://relay.damus.io,wss://relay.nostr.band,wss://nos.lol"
 ./broadcast-relay
 ```
+
+#### Logging Levels
+
+**Default (quiet) mode** shows:
+- Startup phases and configuration
+- Batch operation summaries
+- Critical events and warnings
+- Server addresses and endpoints
+- Periodic refresh results
+
+**Verbose mode** (`-v` or `--verbose`) additionally shows:
+- Individual relay health checks
+- Every event broadcast and publish
+- Detailed discovery progress
+- Individual relay additions and updates
+- Success rate calculations
 
 ### Connecting Clients
 
