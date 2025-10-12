@@ -12,7 +12,7 @@ var verboseAll bool
 // SetVerbose sets the verbose logging mode with granular filtering
 // Examples:
 //   - "" or "false": disable all verbose logging
-//   - "true": enable all verbose logging
+//   - "true" or "all": enable all verbose logging
 //   - "config,health": enable verbose for config and health modules
 //   - "broadcaster.addEventToCache,main": enable broadcaster.addEventToCache method and all of main module
 func SetVerbose(verboseStr string) {
@@ -24,7 +24,7 @@ func SetVerbose(verboseStr string) {
 		return
 	}
 
-	if verboseStr == "true" {
+	if verboseStr == "true" || verboseStr == "all" {
 		Verbose = true
 		verboseAll = true
 		return

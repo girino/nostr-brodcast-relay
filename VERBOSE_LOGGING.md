@@ -6,9 +6,11 @@ The broadcast-relay now supports granular verbose logging by module and method, 
 
 ### Enable All Verbose Logging
 ```bash
-./broadcast-relay --verbose true
+./broadcast-relay --verbose all
 # or
-./broadcast-relay -v true
+./broadcast-relay --verbose true
+# or shorthand
+./broadcast-relay -v all
 ```
 
 ### Enable Specific Modules
@@ -65,6 +67,12 @@ The broadcast-relay now supports granular verbose logging by module and method, 
 ### Debug Everything in Broadcaster
 ```bash
 ./broadcast-relay --verbose "broadcaster"
+```
+
+### Debug All Modules (Alternative Syntax)
+```bash
+./broadcast-relay --verbose all
+# Same as --verbose true
 ```
 
 ### Debug Multiple Systems

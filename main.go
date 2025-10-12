@@ -20,7 +20,7 @@ import (
 func main() {
 	// Parse command-line flags
 	var verbose string
-	flag.StringVar(&verbose, "verbose", "", "Enable verbose logging. Examples: 'true' (all), 'config,health' (modules), 'broadcaster.addEventToCache' (specific method)")
+	flag.StringVar(&verbose, "verbose", "", "Enable verbose logging. Examples: 'all' or 'true' (everything), 'config,health' (modules), 'broadcaster.addEventToCache' (specific method)")
 	flag.StringVar(&verbose, "v", "", "Enable verbose logging (shorthand)")
 	flag.Parse()
 
