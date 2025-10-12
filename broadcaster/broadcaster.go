@@ -136,7 +136,7 @@ func (b *Broadcaster) backfillChannel() {
 func (b *Broadcaster) isEventCached(eventID string) bool {
 	b.cacheMutex.RLock()
 	defer b.cacheMutex.RUnlock()
-
+	
 	_, exists := b.eventCache[eventID]
 	if exists {
 		atomic.AddInt64(&b.cacheHits, 1)
@@ -144,6 +144,11 @@ func (b *Broadcaster) isEventCached(eventID string) bool {
 		atomic.AddInt64(&b.cacheMisses, 1)
 	}
 	return exists
+}
+
+// IsEventCached checks if an event ID is in the cache (public method for relay)
+func (b *Broadcaster) IsEventCached(eventID string) bool {
+	return b.isEventCached(eventID)
 }
 
 // addEventToCache adds an event ID to the cache
@@ -182,14 +187,8 @@ func (b *Broadcaster) Broadcast(event *nostr.Event) {
 		return
 	default:
 	}
-
-	// Check if event was already broadcast (prevent recursion/duplicates)
-	if b.isEventCached(event.ID) {
-		logging.DebugMethod("broadcaster", "Broadcast", "Event %s (kind %d) already broadcast, skipping (cache hit)", event.ID, event.Kind)
-		return
-	}
-
-	// Add to cache before queueing
+	
+	// Add to cache (should not be cached yet since relay rejects duplicates)
 	b.addEventToCache(event.ID)
 
 	// Try to add to channel first (fast path)

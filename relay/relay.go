@@ -43,10 +43,14 @@ func (r *Relay) setupRelay() {
 	relay.Info.Software = "https://github.com/girino/broadcast-relay"
 	relay.Info.Version = "1.0.0"
 
-	// Reject storage - we don't store events
+	// Reject cached events (duplicates)
 	relay.RejectEvent = append(relay.RejectEvent,
 		func(ctx context.Context, event *nostr.Event) (bool, string) {
-			// We accept all events but don't store them
+			// Check if event was already broadcast
+			if r.broadcaster.IsEventCached(event.ID) {
+				logging.DebugMethod("relay", "RejectEvent", "Rejecting duplicate event %s (kind %d)", event.ID, event.Kind)
+				return true, "duplicate: event already broadcast"
+			}
 			return false, ""
 		},
 	)
