@@ -39,7 +39,7 @@ func (d *Discovery) DiscoverFromSeeds(ctx context.Context, seedRelays []string) 
 
 	// Discover more relays from seeds
 	relayURLs := make(map[string]bool)
-	
+
 	for i, seedURL := range seedRelays {
 		logging.LogV("[DISCOVERY] Fetching relay lists from seed %d/%d: %s", i+1, len(seedRelays), seedURL)
 		relays := d.fetchRelaysFromRelay(ctx, seedURL)
@@ -60,7 +60,7 @@ func (d *Discovery) DiscoverFromSeeds(ctx context.Context, seedRelays []string) 
 	}
 
 	log.Printf("[DISCOVERY] Added %d new relays from discovery", len(newRelays))
-	
+
 	// Test all relays (seeds + discovered)
 	allRelays := d.manager.GetAllRelays()
 	d.checker.CheckBatch(allRelays)
@@ -120,12 +120,12 @@ func (d *Discovery) fetchRelaysFromRelay(ctx context.Context, relayURL string) [
 
 done:
 	sub.Unsub()
-	
+
 	result := make([]string, 0, len(relaySet))
 	for relay := range relaySet {
 		result = append(result, relay)
 	}
-	
+
 	logging.LogV("[DISCOVERY] Fetched %d relay URLs from %s", len(result), relayURL)
 	return result
 }

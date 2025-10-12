@@ -16,6 +16,23 @@ Example:
 export SEED_RELAYS="wss://relay.damus.io,wss://relay.nostr.band,wss://nos.lol,wss://relay.snort.social"
 ```
 
+### MANDATORY_RELAYS
+**Default:** none
+
+Comma-separated list of mandatory relay URLs. These relays will ALWAYS receive broadcasts, regardless of their score or ranking.
+
+This is useful for ensuring events reach specific relays, such as:
+- Your own personal relay
+- Backup relays you control
+- Critical infrastructure relays
+
+Mandatory relays are added in addition to the top N relays selected by the scoring algorithm.
+
+Example:
+```bash
+export MANDATORY_RELAYS="wss://my-relay.com,wss://backup-relay.com"
+```
+
 ## Optional Configuration
 
 ### TOP_N_RELAYS

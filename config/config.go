@@ -9,6 +9,7 @@ import (
 
 type Config struct {
 	SeedRelays          []string
+	MandatoryRelays     []string
 	TopNRelays          int
 	RelayPort           string
 	RefreshInterval     time.Duration
@@ -20,6 +21,7 @@ type Config struct {
 func Load() *Config {
 	return &Config{
 		SeedRelays:          parseSeedRelays(getEnv("SEED_RELAYS", "ws://localhost:10547")),
+		MandatoryRelays:     parseSeedRelays(getEnv("MANDATORY_RELAYS", "")),
 		TopNRelays:          getEnvInt("TOP_N_RELAYS", 50),
 		RelayPort:           getEnv("RELAY_PORT", "3334"),
 		RefreshInterval:     getEnvDuration("REFRESH_INTERVAL", 24*time.Hour),

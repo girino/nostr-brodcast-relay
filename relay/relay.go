@@ -101,7 +101,7 @@ func (r *Relay) setupRelay() {
 
 func (r *Relay) handleEvent(event *nostr.Event) {
 	logging.LogV("[RELAY] Received event: id=%s, kind=%d, author=%s", event.ID, event.Kind, event.PubKey[:16]+"...")
-	
+
 	// Extract relay URLs from the event (works for all event kinds)
 	relays := r.discovery.ExtractRelaysFromEvent(event)
 

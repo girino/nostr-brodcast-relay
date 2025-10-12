@@ -13,15 +13,20 @@ import (
 )
 
 type Broadcaster struct {
-	manager *manager.Manager
-	checker *health.Checker
+	manager         *manager.Manager
+	checker         *health.Checker
+	mandatoryRelays []string
 }
 
-func NewBroadcaster(mgr *manager.Manager, checker *health.Checker) *Broadcaster {
+func NewBroadcaster(mgr *manager.Manager, checker *health.Checker, mandatoryRelays []string) *Broadcaster {
 	logging.LogV("[BROADCASTER] Initializing broadcaster")
+	if len(mandatoryRelays) > 0 {
+		log.Printf("[BROADCASTER] Configured with %d mandatory relays", len(mandatoryRelays))
+	}
 	return &Broadcaster{
-		manager: mgr,
-		checker: checker,
+		manager:         mgr,
+		checker:         checker,
+		mandatoryRelays: mandatoryRelays,
 	}
 }
 
@@ -29,23 +34,43 @@ func NewBroadcaster(mgr *manager.Manager, checker *health.Checker) *Broadcaster 
 func (b *Broadcaster) Broadcast(event *nostr.Event) {
 	topRelays := b.manager.GetTopRelays()
 
-	if len(topRelays) == 0 {
+	// Build complete relay list: mandatory + top N
+	relayURLs := make(map[string]bool)
+
+	// Add mandatory relays first
+	for _, url := range b.mandatoryRelays {
+		relayURLs[url] = true
+	}
+
+	// Add top N relays
+	for _, relayInfo := range topRelays {
+		relayURLs[relayInfo.URL] = true
+	}
+
+	// Convert to slice
+	broadcastRelays := make([]string, 0, len(relayURLs))
+	for url := range relayURLs {
+		broadcastRelays = append(broadcastRelays, url)
+	}
+
+	if len(broadcastRelays) == 0 {
 		log.Printf("[BROADCASTER] WARNING: No relays available for broadcasting event %s (kind %d)", event.ID, event.Kind)
 		return
 	}
 
-	logging.LogV("[BROADCASTER] Broadcasting event %s (kind %d) to %d relays", event.ID, event.Kind, len(topRelays))
+	logging.LogV("[BROADCASTER] Broadcasting event %s (kind %d) to %d relays (%d mandatory + %d top)",
+		event.ID, event.Kind, len(broadcastRelays), len(b.mandatoryRelays), len(topRelays))
 
 	var wg sync.WaitGroup
 	successCount := 0
 	failCount := 0
 	var mu sync.Mutex
 
-	for _, relayInfo := range topRelays {
+	for _, url := range broadcastRelays {
 		wg.Add(1)
-		go func(url string) {
+		go func(u string) {
 			defer wg.Done()
-			success := b.publishToRelay(url, event)
+			success := b.publishToRelay(u, event)
 			mu.Lock()
 			if success {
 				successCount++
@@ -53,14 +78,14 @@ func (b *Broadcaster) Broadcast(event *nostr.Event) {
 				failCount++
 			}
 			mu.Unlock()
-		}(relayInfo.URL)
+		}(url)
 	}
 
 	// Track results in background
 	go func() {
 		wg.Wait()
 		logging.LogV("[BROADCASTER] Broadcast complete for event %s | success=%d, failed=%d, total=%d",
-			event.ID, successCount, failCount, len(topRelays))
+			event.ID, successCount, failCount, len(broadcastRelays))
 	}()
 }
 

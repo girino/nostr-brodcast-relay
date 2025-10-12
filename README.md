@@ -101,6 +101,7 @@ export SEED_RELAYS="wss://relay.damus.io,wss://relay.nostr.band,wss://nos.lol"
 ### Optional Configuration
 
 ```bash
+export MANDATORY_RELAYS="wss://my-relay.com,wss://backup.com"  # Always broadcast to these (default: none)
 export TOP_N_RELAYS=50              # Number of top relays to broadcast to (default: 50)
 export RELAY_PORT=3334              # Port to listen on (default: 3334)
 export REFRESH_INTERVAL=24h         # Relay list refresh interval (default: 24h)
@@ -278,6 +279,21 @@ broadcast-relay/
 2. **Reliability**: Automatically avoid unreliable relays
 3. **Performance**: Always use the fastest relays
 4. **Discovery**: Help clients discover new, high-quality relays
+
+## Mandatory Relays
+
+You can specify mandatory relays that will ALWAYS receive broadcasts, regardless of their score or ranking:
+
+```bash
+export MANDATORY_RELAYS="wss://my-relay.com,wss://backup-relay.com"
+```
+
+Use cases:
+- **Personal relays**: Ensure your own relay always receives your events
+- **Backup relays**: Guarantee critical relays always get events
+- **Infrastructure relays**: Maintain connectivity to specific relays
+
+Mandatory relays are broadcasted to in addition to the top N scored relays. If a mandatory relay is also in the top N, it won't be broadcast to twice (deduplication).
 
 ## Ephemeral Events
 

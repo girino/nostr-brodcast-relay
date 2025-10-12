@@ -42,6 +42,12 @@ func main() {
 			log.Printf("[CONFIG]     %d. %s", i+1, seed)
 		}
 	}
+	log.Printf("[CONFIG]   - Mandatory relays: %d", len(cfg.MandatoryRelays))
+	if verbose && len(cfg.MandatoryRelays) > 0 {
+		for i, relay := range cfg.MandatoryRelays {
+			log.Printf("[CONFIG]     %d. %s", i+1, relay)
+		}
+	}
 	log.Printf("[CONFIG]   - Top N relays: %d", cfg.TopNRelays)
 	log.Printf("[CONFIG]   - Relay port: %s", cfg.RelayPort)
 	if verbose {
@@ -57,7 +63,7 @@ func main() {
 	mgr := manager.NewManager(cfg.TopNRelays, cfg.SuccessRateDecay)
 	checker := health.NewChecker(mgr, cfg.InitialTimeout)
 	disc := discovery.NewDiscovery(mgr, checker)
-	bc := broadcaster.NewBroadcaster(mgr, checker)
+	bc := broadcaster.NewBroadcaster(mgr, checker, cfg.MandatoryRelays)
 	log.Println("")
 
 	// Initial relay discovery and testing
@@ -79,7 +85,7 @@ func main() {
 		for i, r := range topRelays {
 			if i < 10 { // Show top 10
 				log.Printf("[MAIN]   %d. %s", i+1, r.URL)
-				log.Printf("[MAIN]      Success: %.2f%%, Avg time: %.2fms, Attempts: %d", 
+				log.Printf("[MAIN]      Success: %.2f%%, Avg time: %.2fms, Attempts: %d",
 					r.SuccessRate*100, float64(r.AvgResponseTime.Milliseconds()), r.TotalAttempts)
 			}
 		}
@@ -142,14 +148,14 @@ func startPeriodicRefresh(ctx context.Context, cfg *config.Config, disc *discove
 			logging.LogV("==============================================================")
 			logging.LogV("[REFRESH] === STARTING PERIODIC RELAY REFRESH ===")
 			logging.LogV("==============================================================")
-			
+
 			disc.DiscoverFromSeeds(ctx, cfg.SeedRelays)
-			
+
 			topRelays := mgr.GetTopRelays()
 			log.Printf("[REFRESH] Refresh complete: %d top relays from %d total relays", len(topRelays), mgr.GetRelayCount())
 			logging.LogV("==============================================================")
 			logging.LogV("")
-			
+
 		case <-ctx.Done():
 			logging.LogV("[REFRESH] Periodic refresh stopped")
 			return
