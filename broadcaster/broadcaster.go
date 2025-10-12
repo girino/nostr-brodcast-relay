@@ -126,8 +126,10 @@ func (b *Broadcaster) GetStats() map[string]interface{} {
 		if i >= 10 { // Only show top 10 in stats
 			break
 		}
+		score := b.manager.CalculateScore(relay)
 		relayStats := map[string]interface{}{
 			"url":             relay.URL,
+			"score":           score,
 			"success_rate":    relay.SuccessRate,
 			"avg_response_ms": relay.AvgResponseTime.Milliseconds(),
 			"total_attempts":  relay.TotalAttempts,

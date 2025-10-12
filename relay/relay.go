@@ -138,6 +138,7 @@ func (r *Relay) Start() error {
 		for i, relay := range topRelays {
 			fmt.Fprintf(w, "    {\n")
 			fmt.Fprintf(w, "      \"url\": \"%s\",\n", relay["url"])
+			fmt.Fprintf(w, "      \"score\": %.2f,\n", relay["score"])
 			fmt.Fprintf(w, "      \"success_rate\": %.4f,\n", relay["success_rate"])
 			fmt.Fprintf(w, "      \"avg_response_ms\": %d,\n", relay["avg_response_ms"])
 			fmt.Fprintf(w, "      \"total_attempts\": %d\n", relay["total_attempts"])

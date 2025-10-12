@@ -166,9 +166,9 @@ func (m *Manager) GetTopRelays() []*RelayInfo {
 	return relays
 }
 
-// calculateScore computes a composite score for ranking
+// CalculateScore computes a composite score for ranking
 // Higher is better
-func (m *Manager) calculateScore(relay *RelayInfo) float64 {
+func (m *Manager) CalculateScore(relay *RelayInfo) float64 {
 	// Success rate weight
 	successWeight := 100.0
 
@@ -186,6 +186,11 @@ func (m *Manager) calculateScore(relay *RelayInfo) float64 {
 	}
 
 	return score
+}
+
+// calculateScore is the internal version
+func (m *Manager) calculateScore(relay *RelayInfo) float64 {
+	return m.CalculateScore(relay)
 }
 
 // GetAllRelays returns all relays (for discovery purposes)
