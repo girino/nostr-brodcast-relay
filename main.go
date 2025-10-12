@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -28,69 +27,69 @@ func main() {
 	// Set verbose mode in logging package
 	logging.SetVerbose(verbose)
 
-	log.Println("==============================================================")
-	log.Println("=== BROADCAST RELAY STARTING ===")
-	log.Println("==============================================================")
+	logging.Info("==============================================================")
+	logging.Info("=== BROADCAST RELAY STARTING ===")
+	logging.Info("==============================================================")
 
 	// Load configuration
 	cfg := config.Load()
-	log.Println("")
-	log.Println("[CONFIG] Configuration loaded:")
-	log.Printf("[CONFIG]   - Seed relays: %d", len(cfg.SeedRelays))
+	logging.Info("")
+	logging.Info("Configuration loaded:")
+	logging.Info("  - Seed relays: %d", len(cfg.SeedRelays))
 	for i, seed := range cfg.SeedRelays {
-		logging.LogV("[CONFIG]     %d. %s", i+1, seed)
+		logging.Debug("    %d. %s", i+1, seed)
 	}
-	log.Printf("[CONFIG]   - Mandatory relays: %d", len(cfg.MandatoryRelays))
+	logging.Info("  - Mandatory relays: %d", len(cfg.MandatoryRelays))
 	for i, relay := range cfg.MandatoryRelays {
-		logging.LogV("[CONFIG]     %d. %s", i+1, relay)
+		logging.Debug("    %d. %s", i+1, relay)
 	}
-	log.Printf("[CONFIG]   - Top N relays: %d", cfg.TopNRelays)
-	log.Printf("[CONFIG]   - Relay port: %s", cfg.RelayPort)
-	logging.LogV("[CONFIG]   - Refresh interval: %v", cfg.RefreshInterval)
-	logging.LogV("[CONFIG]   - Health check interval: %v", cfg.HealthCheckInterval)
-	logging.LogV("[CONFIG]   - Initial timeout: %v", cfg.InitialTimeout)
-	logging.LogV("[CONFIG]   - Success rate decay: %.2f", cfg.SuccessRateDecay)
-	log.Println("")
+	logging.Info("  - Top N relays: %d", cfg.TopNRelays)
+	logging.Info("  - Relay port: %s", cfg.RelayPort)
+	logging.Debug("  - Refresh interval: %v", cfg.RefreshInterval)
+	logging.Debug("  - Health check interval: %v", cfg.HealthCheckInterval)
+	logging.Debug("  - Initial timeout: %v", cfg.InitialTimeout)
+	logging.Debug("  - Success rate decay: %.2f", cfg.SuccessRateDecay)
+	logging.Info("")
 
 	// Initialize components
-	log.Println("[MAIN] Initializing components...")
+	logging.Info("Initializing components...")
 	mgr := manager.NewManager(cfg.TopNRelays, cfg.SuccessRateDecay)
 	checker := health.NewChecker(mgr, cfg.InitialTimeout)
 	disc := discovery.NewDiscovery(mgr, checker)
 	bc := broadcaster.NewBroadcaster(mgr, checker, cfg.MandatoryRelays)
-	log.Println("")
+	logging.Info("")
 
 	// Initial relay discovery and testing
-	log.Println("[MAIN] ========== PHASE 1: DISCOVERY & TESTING ==========")
+	logging.Info("========== PHASE 1: DISCOVERY & TESTING ==========")
 	ctx := context.Background()
 	disc.DiscoverFromSeeds(ctx, cfg.SeedRelays)
-	log.Println("")
+	logging.Info("")
 
 	// Mark manager as initialized to switch to exponential decay
 	mgr.MarkInitialized()
-	log.Println("")
+	logging.Info("")
 
 	// Log initial top relays
-	log.Println("[MAIN] ========== PHASE 2: INITIAL RELAY SELECTION ==========")
+	logging.Info("========== PHASE 2: INITIAL RELAY SELECTION ==========")
 	topRelays := mgr.GetTopRelays()
-	log.Printf("[MAIN] Selected top %d relays from %d total relays", len(topRelays), mgr.GetRelayCount())
-	logging.LogV("[MAIN] Top 10 relays:")
+	logging.Info("Selected top %d relays from %d total relays", len(topRelays), mgr.GetRelayCount())
+	logging.Debug("Top 10 relays:")
 	for i, r := range topRelays {
 		if i < 10 { // Show top 10
-			logging.LogV("[MAIN]   %d. %s", i+1, r.URL)
-			logging.LogV("[MAIN]      Success: %.2f%%, Avg time: %.2fms, Attempts: %d",
+			logging.Debug("  %d. %s", i+1, r.URL)
+			logging.Debug("     Success: %.2f%%, Avg time: %.2fms, Attempts: %d",
 				r.SuccessRate*100, float64(r.AvgResponseTime.Milliseconds()), r.TotalAttempts)
 		}
 	}
-	log.Println("")
+	logging.Info("")
 
 	// Start periodic refresh
-	log.Println("[MAIN] Starting periodic refresh background task...")
+	logging.Info("Starting periodic refresh background task...")
 	go startPeriodicRefresh(ctx, cfg, disc, mgr)
 
 	// Start the relay server
-	log.Println("")
-	log.Println("[MAIN] ========== PHASE 3: STARTING RELAY SERVER ==========")
+	logging.Info("")
+	logging.Info("========== PHASE 3: STARTING RELAY SERVER ==========")
 	relayServer := relay.NewRelay(cfg.RelayPort, bc, disc)
 
 	// Handle graceful shutdown
@@ -100,33 +99,34 @@ func main() {
 	// Start relay in goroutine
 	go func() {
 		if err := relayServer.Start(); err != nil {
-			log.Fatalf("[MAIN] Relay server error: %v", err)
+			logging.Error("Relay server error: %v", err)
+			os.Exit(1)
 		}
 	}()
 
-	log.Println("")
-	log.Println("==============================================================")
-	log.Println("=== BROADCAST RELAY IS NOW RUNNING ===")
-	log.Printf("=== WebSocket: ws://localhost:%s ===", cfg.RelayPort)
-	log.Printf("=== Stats: http://localhost:%s/stats ===", cfg.RelayPort)
-	log.Println("=== Press Ctrl+C to stop ===")
-	log.Println("==============================================================")
-	log.Println("")
+	logging.Info("")
+	logging.Info("==============================================================")
+	logging.Info("=== BROADCAST RELAY IS NOW RUNNING ===")
+	logging.Info("=== WebSocket: ws://localhost:%s ===", cfg.RelayPort)
+	logging.Info("=== Stats: http://localhost:%s/stats ===", cfg.RelayPort)
+	logging.Info("=== Press Ctrl+C to stop ===")
+	logging.Info("==============================================================")
+	logging.Info("")
 
 	// Wait for interrupt signal
 	<-sigChan
-	log.Println("")
-	log.Println("==============================================================")
-	log.Println("=== SHUTTING DOWN GRACEFULLY ===")
-	log.Println("==============================================================")
+	logging.Info("")
+	logging.Info("==============================================================")
+	logging.Info("=== SHUTTING DOWN GRACEFULLY ===")
+	logging.Info("==============================================================")
 
 	// Print final stats
 	stats := bc.GetStats()
-	log.Printf("[MAIN] Final stats:")
-	log.Printf("[MAIN]   - Total relays: %v", stats["total_relays"])
-	log.Printf("[MAIN]   - Active relays: %v", stats["active_relays"])
-	log.Println("")
-	log.Println("[MAIN] Goodbye!")
+	logging.Info("Final stats:")
+	logging.Info("  - Total relays: %v", stats["total_relays"])
+	logging.Info("  - Active relays: %v", stats["active_relays"])
+	logging.Info("")
+	logging.Info("Goodbye!")
 }
 
 func startPeriodicRefresh(ctx context.Context, cfg *config.Config, disc *discovery.Discovery, mgr *manager.Manager) {
@@ -136,20 +136,20 @@ func startPeriodicRefresh(ctx context.Context, cfg *config.Config, disc *discove
 	for {
 		select {
 		case <-ticker.C:
-			logging.LogV("")
-			logging.LogV("==============================================================")
-			logging.LogV("[REFRESH] === STARTING PERIODIC RELAY REFRESH ===")
-			logging.LogV("==============================================================")
+			logging.Debug("")
+			logging.Debug("==============================================================")
+			logging.Info("Starting periodic relay refresh...")
+			logging.Debug("==============================================================")
 
 			disc.DiscoverFromSeeds(ctx, cfg.SeedRelays)
 
 			topRelays := mgr.GetTopRelays()
-			log.Printf("[REFRESH] Refresh complete: %d top relays from %d total relays", len(topRelays), mgr.GetRelayCount())
-			logging.LogV("==============================================================")
-			logging.LogV("")
+			logging.Info("Refresh complete: %d top relays from %d total relays", len(topRelays), mgr.GetRelayCount())
+			logging.Debug("==============================================================")
+			logging.Debug("")
 
 		case <-ctx.Done():
-			logging.LogV("[REFRESH] Periodic refresh stopped")
+			logging.Debug("Periodic refresh stopped")
 			return
 		}
 	}

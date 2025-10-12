@@ -2,7 +2,6 @@ package broadcaster
 
 import (
 	"context"
-	"log"
 	"sync"
 	"time"
 
@@ -19,9 +18,9 @@ type Broadcaster struct {
 }
 
 func NewBroadcaster(mgr *manager.Manager, checker *health.Checker, mandatoryRelays []string) *Broadcaster {
-	logging.LogV("[BROADCASTER] Initializing broadcaster")
+	logging.Debug("Broadcaster: Initializing broadcaster")
 	if len(mandatoryRelays) > 0 {
-		log.Printf("[BROADCASTER] Configured with %d mandatory relays", len(mandatoryRelays))
+		logging.Info("Broadcaster: Configured with %d mandatory relays", len(mandatoryRelays))
 	}
 	return &Broadcaster{
 		manager:         mgr,
@@ -54,11 +53,11 @@ func (b *Broadcaster) Broadcast(event *nostr.Event) {
 	}
 
 	if len(broadcastRelays) == 0 {
-		log.Printf("[BROADCASTER] WARNING: No relays available for broadcasting event %s (kind %d)", event.ID, event.Kind)
+		logging.Warn("Broadcaster: No relays available for broadcasting event %s (kind %d)", event.ID, event.Kind)
 		return
 	}
 
-	logging.LogV("[BROADCASTER] Broadcasting event %s (kind %d) to %d relays (%d mandatory + %d top)",
+	logging.Debug("Broadcaster: Broadcasting event %s (kind %d) to %d relays (%d mandatory + %d top)",
 		event.ID, event.Kind, len(broadcastRelays), len(b.mandatoryRelays), len(topRelays))
 
 	var wg sync.WaitGroup
@@ -84,7 +83,7 @@ func (b *Broadcaster) Broadcast(event *nostr.Event) {
 	// Track results in background
 	go func() {
 		wg.Wait()
-		logging.LogV("[BROADCASTER] Broadcast complete for event %s | success=%d, failed=%d, total=%d",
+		logging.Debug("Broadcaster: Broadcast complete for event %s | success=%d, failed=%d, total=%d",
 			event.ID, successCount, failCount, len(broadcastRelays))
 	}()
 }
@@ -98,7 +97,7 @@ func (b *Broadcaster) publishToRelay(url string, event *nostr.Event) bool {
 
 	relay, err := nostr.RelayConnect(ctx, url)
 	if err != nil {
-		logging.LogV("[BROADCASTER] FAILED to connect to %s: %v", url, err)
+		logging.Debug("Broadcaster: Failed to connect to %s: %v", url, err)
 		b.checker.TrackPublishResult(health.PublishResult{
 			URL:          url,
 			Success:      false,
@@ -122,10 +121,10 @@ func (b *Broadcaster) publishToRelay(url string, event *nostr.Event) bool {
 	})
 
 	if success {
-		logging.LogV("[BROADCASTER] SUCCESS: Published event %s to %s (%.2fms)",
+		logging.Debug("Broadcaster: Published event %s to %s (%.2fms)",
 			event.ID, url, elapsed.Seconds()*1000)
 	} else {
-		logging.LogV("[BROADCASTER] FAILED to publish to %s: %v (%.2fms)",
+		logging.Debug("Broadcaster: Failed to publish to %s: %v (%.2fms)",
 			url, err, elapsed.Seconds()*1000)
 	}
 

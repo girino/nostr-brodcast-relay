@@ -2,7 +2,6 @@ package health
 
 import (
 	"context"
-	"log"
 	"sync"
 	"time"
 
@@ -17,7 +16,7 @@ type Checker struct {
 }
 
 func NewChecker(mgr *manager.Manager, initialTimeout time.Duration) *Checker {
-	logging.LogV("[HEALTH] Initializing health checker with timeout=%v", initialTimeout)
+	logging.Debug("Health: Initializing health checker with timeout=%v", initialTimeout)
 	return &Checker{
 		manager:        mgr,
 		initialTimeout: initialTimeout,
@@ -26,8 +25,8 @@ func NewChecker(mgr *manager.Manager, initialTimeout time.Duration) *Checker {
 
 // CheckInitial performs initial timeout-based health check on a relay
 func (c *Checker) CheckInitial(url string) bool {
-	logging.LogV("[HEALTH] Testing relay: %s", url)
-
+	logging.Debug("Health: Testing relay: %s", url)
+	
 	ctx, cancel := context.WithTimeout(context.Background(), c.initialTimeout)
 	defer cancel()
 
@@ -35,25 +34,24 @@ func (c *Checker) CheckInitial(url string) bool {
 	relay, err := nostr.RelayConnect(ctx, url)
 	if err != nil {
 		elapsed := time.Since(start)
-		logging.LogV("[HEALTH] FAILED: %s | error=%v | time=%.2fms", url, err, elapsed.Seconds()*1000)
+		logging.Debug("Health: Failed to connect to %s | error=%v | time=%.2fms", url, err, elapsed.Seconds()*1000)
 		c.manager.UpdateHealth(url, false, 0)
 		return false
 	}
 	defer relay.Close()
 
 	elapsed := time.Since(start)
-
+	
 	// Consider it successful if we connected
 	c.manager.UpdateHealth(url, true, elapsed)
-	logging.LogV("[HEALTH] SUCCESS: %s | time=%.2fms", url, elapsed.Seconds()*1000)
+	logging.Debug("Health: Connected successfully to %s | time=%.2fms", url, elapsed.Seconds()*1000)
 	return true
 }
 
 // CheckBatch performs initial checks on multiple relays concurrently
 func (c *Checker) CheckBatch(urls []string) {
-	logging.LogV("[HEALTH] ========== Starting batch health check ==========")
-	logging.LogV("[HEALTH] Testing %d relays (max 20 concurrent)", len(urls))
-
+	logging.Debug("Health: Starting batch health check of %d relays (max 20 concurrent)", len(urls))
+	
 	sem := make(chan struct{}, 20) // Limit concurrent checks
 	var wg sync.WaitGroup
 	successCount := 0
@@ -61,14 +59,14 @@ func (c *Checker) CheckBatch(urls []string) {
 	var mu sync.Mutex
 
 	start := time.Now()
-
+	
 	for _, url := range urls {
 		wg.Add(1)
 		go func(u string) {
 			defer wg.Done()
 			sem <- struct{}{}        // Acquire semaphore
 			defer func() { <-sem }() // Release semaphore
-
+			
 			success := c.CheckInitial(u)
 			mu.Lock()
 			if success {
@@ -82,9 +80,9 @@ func (c *Checker) CheckBatch(urls []string) {
 
 	wg.Wait()
 	elapsed := time.Since(start)
-
+	
 	// Always log the summary
-	log.Printf("[HEALTH] Batch check complete: %d success, %d failed out of %d total (%.2fs)",
+	logging.Info("Health: Batch check complete - %d success, %d failed out of %d total (%.2fs)", 
 		successCount, failCount, len(urls), elapsed.Seconds())
 }
 
@@ -99,8 +97,8 @@ type PublishResult struct {
 // TrackPublishResult updates relay health based on publish results
 func (c *Checker) TrackPublishResult(result PublishResult) {
 	c.manager.UpdateHealth(result.URL, result.Success, result.ResponseTime)
-
+	
 	if !result.Success && result.Error != nil {
-		logging.LogV("[HEALTH] Publish to %s failed: %v", result.URL, result.Error)
+		logging.Debug("Health: Publish to %s failed: %v", result.URL, result.Error)
 	}
 }

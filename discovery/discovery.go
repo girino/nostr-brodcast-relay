@@ -3,7 +3,6 @@ package discovery
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"strings"
 	"time"
 
@@ -19,7 +18,7 @@ type Discovery struct {
 }
 
 func NewDiscovery(mgr *manager.Manager, checker *health.Checker) *Discovery {
-	logging.LogV("[DISCOVERY] Initializing discovery module")
+	logging.Debug("Discovery: Initializing discovery module")
 	return &Discovery{
 		manager: mgr,
 		checker: checker,
@@ -28,27 +27,27 @@ func NewDiscovery(mgr *manager.Manager, checker *health.Checker) *Discovery {
 
 // DiscoverFromSeeds performs initial relay discovery from seed relays
 func (d *Discovery) DiscoverFromSeeds(ctx context.Context, seedRelays []string) {
-	logging.LogV("[DISCOVERY] ========== Starting seed discovery ==========")
-	log.Printf("[DISCOVERY] Using %d seed relays", len(seedRelays))
+	logging.Debug("Discovery: Starting seed discovery")
+	logging.Info("Discovery: Using %d seed relays", len(seedRelays))
 
 	// First, add seed relays to manager
 	for _, seed := range seedRelays {
-		logging.LogV("[DISCOVERY] Adding seed relay: %s", seed)
+		logging.Debug("Discovery: Adding seed relay: %s", seed)
 		d.manager.AddRelay(seed)
 	}
 
 	// Discover more relays from seeds
 	relayURLs := make(map[string]bool)
-
+	
 	for i, seedURL := range seedRelays {
-		logging.LogV("[DISCOVERY] Fetching relay lists from seed %d/%d: %s", i+1, len(seedRelays), seedURL)
+		logging.Debug("Discovery: Fetching relay lists from seed %d/%d: %s", i+1, len(seedRelays), seedURL)
 		relays := d.fetchRelaysFromRelay(ctx, seedURL)
 		for _, relay := range relays {
 			relayURLs[relay] = true
 		}
 	}
 
-	logging.LogV("[DISCOVERY] Found %d unique relay URLs from seeds", len(relayURLs))
+	logging.Debug("Discovery: Found %d unique relay URLs from seeds", len(relayURLs))
 
 	// Add discovered relays
 	newRelays := []string{}
@@ -59,8 +58,8 @@ func (d *Discovery) DiscoverFromSeeds(ctx context.Context, seedRelays []string) 
 		}
 	}
 
-	log.Printf("[DISCOVERY] Added %d new relays from discovery", len(newRelays))
-
+	logging.Info("Discovery: Added %d new relays from discovery", len(newRelays))
+	
 	// Test all relays (seeds + discovered)
 	allRelays := d.manager.GetAllRelays()
 	d.checker.CheckBatch(allRelays)
@@ -75,7 +74,7 @@ func (d *Discovery) fetchRelaysFromRelay(ctx context.Context, relayURL string) [
 
 	relay, err := nostr.RelayConnect(ctx, relayURL)
 	if err != nil {
-		logging.LogV("[DISCOVERY] Failed to connect to seed relay %s: %v", relayURL, err)
+		logging.Debug("Discovery: Failed to connect to seed relay %s: %v", relayURL, err)
 		return []string{}
 	}
 	defer relay.Close()
@@ -90,7 +89,7 @@ func (d *Discovery) fetchRelaysFromRelay(ctx context.Context, relayURL string) [
 
 	sub, err := relay.Subscribe(ctx, filters)
 	if err != nil {
-		logging.LogV("[DISCOVERY] Failed to subscribe to %s: %v", relayURL, err)
+		logging.Debug("Discovery: Failed to subscribe to %s: %v", relayURL, err)
 		return []string{}
 	}
 
@@ -120,13 +119,13 @@ func (d *Discovery) fetchRelaysFromRelay(ctx context.Context, relayURL string) [
 
 done:
 	sub.Unsub()
-
+	
 	result := make([]string, 0, len(relaySet))
 	for relay := range relaySet {
 		result = append(result, relay)
 	}
-
-	logging.LogV("[DISCOVERY] Fetched %d relay URLs from %s", len(result), relayURL)
+	
+	logging.Debug("Discovery: Fetched %d relay URLs from %s", len(result), relayURL)
 	return result
 }
 
@@ -225,7 +224,7 @@ func (d *Discovery) AddRelayIfNew(url string) {
 	}
 
 	if !d.isAlreadyKnown(url) {
-		logging.LogV("[DISCOVERY] New relay discovered: %s (testing...)", url)
+		logging.Debug("Discovery: New relay discovered: %s (testing...)", url)
 		d.manager.AddRelay(url)
 		// Test the new relay
 		go d.checker.CheckInitial(url)

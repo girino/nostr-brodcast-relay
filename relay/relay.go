@@ -3,7 +3,6 @@ package relay
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 
 	"github.com/fiatjaf/khatru"
@@ -100,13 +99,13 @@ func (r *Relay) setupRelay() {
 }
 
 func (r *Relay) handleEvent(event *nostr.Event) {
-	logging.LogV("[RELAY] Received event: id=%s, kind=%d, author=%s", event.ID, event.Kind, event.PubKey[:16]+"...")
+	logging.Debug("Relay: Received event id=%s, kind=%d, author=%s", event.ID, event.Kind, event.PubKey[:16]+"...")
 
 	// Extract relay URLs from the event (works for all event kinds)
 	relays := r.discovery.ExtractRelaysFromEvent(event)
 
 	if len(relays) > 0 {
-		logging.LogV("[RELAY] Extracted %d relay URLs from event %s (kind %d)", len(relays), event.ID, event.Kind)
+		logging.Debug("Relay: Extracted %d relay URLs from event %s (kind %d)", len(relays), event.ID, event.Kind)
 		for _, relayURL := range relays {
 			r.discovery.AddRelayIfNew(relayURL)
 		}
@@ -155,9 +154,9 @@ func (r *Relay) Start() error {
 	})
 
 	addr := fmt.Sprintf(":%s", r.port)
-	log.Printf("Starting relay server on %s", addr)
-	log.Printf("WebSocket: ws://localhost:%s", r.port)
-	log.Printf("Stats: http://localhost:%s/stats", r.port)
+	logging.Info("Relay: Starting relay server on %s", addr)
+	logging.Debug("Relay: WebSocket endpoint ready")
+	logging.Debug("Relay: Stats endpoint ready")
 
 	return http.ListenAndServe(addr, mux)
 }
