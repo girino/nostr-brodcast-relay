@@ -58,6 +58,12 @@ services:
       - ./tor-data:/var/lib/tor/hidden_service
     networks:
       - relay-network
+    healthcheck:
+      test: ["CMD", "sh", "-c", "test -f /var/lib/tor/hidden_service/hostname && pgrep tor"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     logging:
       driver: "json-file"
       options:
@@ -79,6 +85,32 @@ services:
       - relay-network
     profiles:
       - clearnet
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/stats"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Autoheal - automatically restart unhealthy containers
+  autoheal:
+    image: willfarrell/autoheal:latest
+    container_name: broadcast-relay-autoheal
+    restart: unless-stopped
+    environment:
+      - AUTOHEAL_CONTAINER_LABEL=all
+      - AUTOHEAL_INTERVAL=10
+      - AUTOHEAL_START_PERIOD=30
+      - AUTOHEAL_DEFAULT_STOP_TIMEOUT=10
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - relay-network
     logging:
       driver: "json-file"
       options:

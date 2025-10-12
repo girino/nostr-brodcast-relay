@@ -67,9 +67,13 @@ The main broadcast relay service. Exposed only to the internal Docker network by
 
 **Access**: Internal only (through Tor or Nginx)
 
+**Health Check**: Verifies `/stats` endpoint is responding
+
 ### Tor Hidden Service
 
 Provides a .onion address for anonymous access.
+
+**Health Check**: Verifies Tor process is running and hostname file exists
 
 **Get your .onion address**:
 ```bash
@@ -94,6 +98,28 @@ docker-compose -f docker-compose.prod.yml --profile clearnet up -d
 ```
 
 **Access**: `ws://localhost:3334` (or set custom port with `CLEARNET_PORT`)
+
+**Health Check**: Verifies nginx can proxy to `/stats` endpoint
+
+### Autoheal Service
+
+Automatically monitors and restarts unhealthy containers.
+
+**Features**:
+- Monitors health checks every 10 seconds
+- Automatically restarts containers that fail health checks
+- Waits 30 seconds before monitoring new containers
+- Monitors all services: relay, tor, and nginx (if enabled)
+
+**View autoheal logs**:
+```bash
+docker-compose -f docker-compose.prod.yml logs -f autoheal
+```
+
+**Configuration**:
+- `AUTOHEAL_INTERVAL=10` - Check health every 10 seconds
+- `AUTOHEAL_START_PERIOD=30` - Grace period for new containers
+- `AUTOHEAL_DEFAULT_STOP_TIMEOUT=10` - Wait time before force kill
 
 ## Tor Hidden Service
 
@@ -140,14 +166,35 @@ The relay runs as a non-root user (`relay:relay`, UID/GID 1000) inside the conta
 
 ### Health Checks
 
-Built-in health checks verify the relay is responding:
+All services have health checks configured:
+
+- **Relay**: Checks `/stats` endpoint every 30s
+- **Tor**: Verifies Tor process and hostname file every 30s  
+- **Nginx**: Checks proxy to `/stats` endpoint every 30s
+- **Autoheal**: Monitors all containers and auto-restarts unhealthy ones
 
 ```bash
-# Check health status
+# Check health status of all containers
 docker-compose -f docker-compose.prod.yml ps
+
+# View detailed health status
+docker inspect broadcast-relay --format='{{.State.Health.Status}}'
+docker inspect broadcast-relay-tor --format='{{.State.Health.Status}}'
 
 # View stats endpoint
 curl http://localhost:3334/stats
+```
+
+### Automatic Recovery
+
+The autoheal service automatically restarts containers that fail health checks:
+
+```bash
+# View autoheal activity
+docker-compose -f docker-compose.prod.yml logs -f autoheal
+
+# Example autoheal log when container becomes unhealthy:
+# [INFO] Container broadcast-relay is unhealthy, restarting...
 ```
 
 ### Logs
@@ -263,22 +310,22 @@ docker exec broadcast-relay wget -qO- http://localhost:3334/stats
 │  (your.onion)   │
 └────────┬────────┘
          │
-    ┌────▼─────┐
-    │   Tor    │
-    │ Hidden   │
-    │ Service  │
-    └────┬─────┘
-         │
-    ┌────▼─────┐         ┌──────────────┐
-    │  Nginx   │◄────────│   Clearnet   │
-    │ (opt.)   │         │   (port 80)  │
-    └────┬─────┘         └──────────────┘
-         │
-    ┌────▼─────────┐
-    │ Broadcast    │
-    │ Relay        │
-    │ (port 3334)  │
-    └──────────────┘
+    ┌────▼─────┐  ◄────────────┐
+    │   Tor    │               │
+    │ Hidden   │  Health       │
+    │ Service  │  Monitored    │
+    └────┬─────┘               │    ┌──────────────┐
+         │                     │    │  Autoheal    │
+    ┌────▼─────┐  ◄────────────┤    │  Monitor     │
+    │  Nginx   │◄──┐           │    │  & Restart   │
+    │ (opt.)   │   │           │    └──────────────┘
+    └────┬─────┘   │           │
+         │         │           │
+    ┌────▼─────────▼─┐  ◄──────┘
+    │ Broadcast      │         ┌──────────────┐
+    │ Relay          │◄────────│   Clearnet   │
+    │ (port 3334)    │         │  (optional)  │
+    └────────────────┘         └──────────────┘
          │
          │ Broadcasts to
          ▼
