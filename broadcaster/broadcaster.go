@@ -17,9 +17,10 @@ type Broadcaster struct {
 	checker         *health.Checker
 	mandatoryRelays []string
 	eventQueue      chan *nostr.Event
-	queueMutex      sync.RWMutex
-	queueCapacity   int64
-	queueSize       int64
+	overflowQueue   []*nostr.Event
+	overflowMutex   sync.Mutex
+	channelCapacity int
+	totalQueued     int64
 	peakQueueSize   int64
 	saturationCount int64
 	lastSaturation  time.Time
@@ -36,15 +37,18 @@ func NewBroadcaster(mgr *manager.Manager, checker *health.Checker, mandatoryRela
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	initialCapacity := int64(10000)
+	channelCapacity := workerCount * 50
+
+	logging.Info("Broadcaster: Channel capacity set to %d (50 * %d workers)", channelCapacity, workerCount)
 
 	return &Broadcaster{
 		manager:         mgr,
 		checker:         checker,
 		mandatoryRelays: mandatoryRelays,
-		eventQueue:      make(chan *nostr.Event, initialCapacity),
-		queueCapacity:   initialCapacity,
-		queueSize:       0,
+		eventQueue:      make(chan *nostr.Event, channelCapacity),
+		overflowQueue:   make([]*nostr.Event, 0),
+		channelCapacity: channelCapacity,
+		totalQueued:     0,
 		peakQueueSize:   0,
 		saturationCount: 0,
 		workerCount:     workerCount,
@@ -81,22 +85,39 @@ func (b *Broadcaster) worker(id int) {
 		case <-b.ctx.Done():
 			logging.Debug("Broadcaster: Worker %d shutting down (context cancelled)", id)
 			return
-		case event, ok := <-b.getEventQueue():
+		case event, ok := <-b.eventQueue:
 			if !ok {
 				logging.Debug("Broadcaster: Worker %d shutting down (queue closed)", id)
 				return
 			}
-			atomic.AddInt64(&b.queueSize, -1)
+			// Decrement total queued count
+			atomic.AddInt64(&b.totalQueued, -1)
+			
+			// Try to backfill from overflow
+			b.backfillChannel()
+			
+			// Broadcast the event
 			b.broadcastEvent(event)
 		}
 	}
 }
 
-// getEventQueue returns the current event queue with read lock
-func (b *Broadcaster) getEventQueue() <-chan *nostr.Event {
-	b.queueMutex.RLock()
-	defer b.queueMutex.RUnlock()
-	return b.eventQueue
+// backfillChannel attempts to move events from overflow queue to channel
+func (b *Broadcaster) backfillChannel() {
+	b.overflowMutex.Lock()
+	defer b.overflowMutex.Unlock()
+
+	// Move events from overflow to channel while there's space and overflow has events
+	for len(b.overflowQueue) > 0 {
+		select {
+		case b.eventQueue <- b.overflowQueue[0]:
+			// Successfully moved to channel, remove from overflow
+			b.overflowQueue = b.overflowQueue[1:]
+		default:
+			// Channel is full, stop trying
+			return
+		}
+	}
 }
 
 // Broadcast enqueues an event for broadcasting
@@ -109,95 +130,50 @@ func (b *Broadcaster) Broadcast(event *nostr.Event) {
 	default:
 	}
 
-	// Try to enqueue with read lock first
-	b.queueMutex.RLock()
-	queue := b.eventQueue
-	capacity := atomic.LoadInt64(&b.queueCapacity)
-	currentSize := atomic.LoadInt64(&b.queueSize)
-	b.queueMutex.RUnlock()
-
+	// Try to add to channel first (fast path)
 	select {
-	case queue <- event:
-		// Successfully queued
-		newSize := atomic.AddInt64(&b.queueSize, 1)
-		logging.Debug("Broadcaster: Event %s (kind %d) queued for broadcast (queue: %d/%d)",
-			event.ID, event.Kind, newSize, capacity)
+	case b.eventQueue <- event:
+		// Successfully queued to channel
+		newTotal := atomic.AddInt64(&b.totalQueued, 1)
+		logging.Debug("Broadcaster: Event %s (kind %d) queued to channel (total: %d)",
+			event.ID, event.Kind, newTotal)
 
 		// Update peak size
 		for {
 			peak := atomic.LoadInt64(&b.peakQueueSize)
-			if newSize <= peak || atomic.CompareAndSwapInt64(&b.peakQueueSize, peak, newSize) {
+			if newTotal <= peak || atomic.CompareAndSwapInt64(&b.peakQueueSize, peak, newTotal) {
 				break
 			}
 		}
 		return
 	default:
-		// Queue is full - need to grow it
-		atomic.AddInt64(&b.saturationCount, 1)
-		b.lastSaturation = time.Now()
+		// Channel is full, add to overflow queue (slow path)
+		b.overflowMutex.Lock()
+		defer b.overflowMutex.Unlock()
 
-		// Log warning (throttled)
-		logging.Warn("Broadcaster: Queue saturated at %d/%d events, growing queue...",
-			currentSize, capacity)
-
-		// Grow the queue
-		b.growQueue()
-
-		// Try again with new queue
-		b.queueMutex.RLock()
-		queue = b.eventQueue
-		b.queueMutex.RUnlock()
-
-		select {
-		case queue <- event:
-			newSize := atomic.AddInt64(&b.queueSize, 1)
-			logging.Debug("Broadcaster: Event %s queued after queue growth (queue: %d)", event.ID, newSize)
-		default:
-			// Still full? This shouldn't happen but handle it
-			logging.Error("Broadcaster: Queue still full after growth, dropping event %s (kind %d)",
-				event.ID, event.Kind)
+		b.overflowQueue = append(b.overflowQueue, event)
+		newTotal := atomic.AddInt64(&b.totalQueued, 1)
+		
+		// Track saturation
+		if len(b.overflowQueue) == 1 {
+			// First overflow, log warning
+			atomic.AddInt64(&b.saturationCount, 1)
+			b.lastSaturation = time.Now()
+			logging.Warn("Broadcaster: Channel saturated (%d/%d), using overflow queue",
+				len(b.eventQueue), b.channelCapacity)
 		}
-	}
-}
+		
+		logging.Debug("Broadcaster: Event %s (kind %d) queued to overflow (overflow: %d, total: %d)",
+			event.ID, event.Kind, len(b.overflowQueue), newTotal)
 
-// growQueue grows the event queue by 1.25x
-func (b *Broadcaster) growQueue() {
-	b.queueMutex.Lock()
-	defer b.queueMutex.Unlock()
-
-	oldCapacity := atomic.LoadInt64(&b.queueCapacity)
-	newCapacity := int64(float64(oldCapacity) * 1.25)
-	if newCapacity <= oldCapacity {
-		newCapacity = oldCapacity + 1000 // Ensure at least some growth
-	}
-
-	logging.Info("Broadcaster: Growing queue from %d to %d", oldCapacity, newCapacity)
-
-	// Create new queue
-	newQueue := make(chan *nostr.Event, newCapacity)
-
-	// Drain old queue into new queue
-	oldQueue := b.eventQueue
-	drained := 0
-	drainLoop:
-	for {
-		select {
-		case event, ok := <-oldQueue:
-			if !ok {
-				break drainLoop
+		// Update peak size
+		for {
+			peak := atomic.LoadInt64(&b.peakQueueSize)
+			if newTotal <= peak || atomic.CompareAndSwapInt64(&b.peakQueueSize, peak, newTotal) {
+				break
 			}
-			newQueue <- event
-			drained++
-		default:
-			break drainLoop
 		}
 	}
-
-	logging.Debug("Broadcaster: Drained %d events from old queue to new queue", drained)
-
-	// Swap the queue
-	b.eventQueue = newQueue
-	atomic.StoreInt64(&b.queueCapacity, newCapacity)
 }
 
 // broadcastEvent sends an event to the top N relays concurrently
@@ -308,23 +284,30 @@ func (b *Broadcaster) GetStats() map[string]interface{} {
 	totalRelays := b.manager.GetRelayCount()
 
 	// Get queue stats
-	currentSize := atomic.LoadInt64(&b.queueSize)
-	capacity := atomic.LoadInt64(&b.queueCapacity)
+	b.overflowMutex.Lock()
+	overflowSize := len(b.overflowQueue)
+	b.overflowMutex.Unlock()
+
+	channelSize := len(b.eventQueue)
+	totalQueued := atomic.LoadInt64(&b.totalQueued)
 	peakSize := atomic.LoadInt64(&b.peakQueueSize)
 	saturationCount := atomic.LoadInt64(&b.saturationCount)
-	utilizationPercent := float64(currentSize) / float64(capacity) * 100.0
+	channelUtilization := float64(channelSize) / float64(b.channelCapacity) * 100.0
+	isSaturated := overflowSize > 0
 
 	stats := map[string]interface{}{
 		"total_relays":  totalRelays,
 		"active_relays": len(topRelays),
 		"queue": map[string]interface{}{
-			"current_size":       currentSize,
-			"capacity":           capacity,
-			"peak_size":          peakSize,
-			"utilization_pct":    utilizationPercent,
-			"saturation_count":   saturationCount,
-			"is_saturated":       currentSize >= capacity,
-			"last_saturation":    b.lastSaturation,
+			"channel_size":        channelSize,
+			"channel_capacity":    b.channelCapacity,
+			"channel_utilization": channelUtilization,
+			"overflow_size":       overflowSize,
+			"total_queued":        totalQueued,
+			"peak_size":           peakSize,
+			"saturation_count":    saturationCount,
+			"is_saturated":        isSaturated,
+			"last_saturation":     b.lastSaturation,
 		},
 		"top_relays": make([]map[string]interface{}, 0, len(topRelays)),
 	}
