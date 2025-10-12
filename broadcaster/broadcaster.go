@@ -27,7 +27,7 @@ func NewBroadcaster(mgr *manager.Manager, checker *health.Checker) *Broadcaster 
 // Broadcast sends an event to the top N relays concurrently
 func (b *Broadcaster) Broadcast(event *nostr.Event) {
 	topRelays := b.manager.GetTopRelays()
-	
+
 	if len(topRelays) == 0 {
 		log.Printf("[BROADCASTER] WARNING: No relays available for broadcasting event %s (kind %d)", event.ID, event.Kind)
 		return
@@ -42,7 +42,7 @@ func (b *Broadcaster) Broadcast(event *nostr.Event) {
 	successCount := 0
 	failCount := 0
 	var mu sync.Mutex
-	
+
 	for _, relayInfo := range topRelays {
 		wg.Add(1)
 		go func(url string) {
@@ -61,7 +61,7 @@ func (b *Broadcaster) Broadcast(event *nostr.Event) {
 	// Track results in background
 	go func() {
 		wg.Wait()
-		log.Printf("[BROADCASTER] Broadcast complete for event %s | success=%d, failed=%d, total=%d", 
+		log.Printf("[BROADCASTER] Broadcast complete for event %s | success=%d, failed=%d, total=%d",
 			event.ID, successCount, failCount, len(topRelays))
 	}()
 }
@@ -72,9 +72,9 @@ func (b *Broadcaster) publishToRelay(url string, event *nostr.Event) bool {
 	defer cancel()
 
 	start := time.Now()
-	
+
 	log.Printf("[BROADCASTER] Publishing to %s...", url)
-	
+
 	relay, err := nostr.RelayConnect(ctx, url)
 	if err != nil {
 		log.Printf("[BROADCASTER] FAILED to connect to %s: %v", url, err)
@@ -92,7 +92,7 @@ func (b *Broadcaster) publishToRelay(url string, event *nostr.Event) bool {
 	elapsed := time.Since(start)
 
 	success := err == nil
-	
+
 	b.checker.TrackPublishResult(health.PublishResult{
 		URL:          url,
 		Success:      success,
@@ -101,13 +101,13 @@ func (b *Broadcaster) publishToRelay(url string, event *nostr.Event) bool {
 	})
 
 	if success {
-		log.Printf("[BROADCASTER] SUCCESS: Published event %s to %s (%.2fms)", 
+		log.Printf("[BROADCASTER] SUCCESS: Published event %s to %s (%.2fms)",
 			event.ID, url, elapsed.Seconds()*1000)
 	} else {
-		log.Printf("[BROADCASTER] FAILED to publish to %s: %v (%.2fms)", 
+		log.Printf("[BROADCASTER] FAILED to publish to %s: %v (%.2fms)",
 			url, err, elapsed.Seconds()*1000)
 	}
-	
+
 	return success
 }
 

@@ -67,7 +67,7 @@ func (m *Manager) UpdateHealth(url string, success bool, responseTime time.Durat
 
 	oldSuccessRate := relay.SuccessRate
 	relay.TotalAttempts++
-	
+
 	if success {
 		relay.SuccessfulAttempts++
 
@@ -80,12 +80,12 @@ func (m *Manager) UpdateHealth(url string, success bool, responseTime time.Durat
 				float64(relay.AvgResponseTime)*0.7 + float64(responseTime)*0.3,
 			)
 		}
-		
-		log.Printf("[MANAGER] Health update SUCCESS: %s | attempts=%d/%d | responseTime=%.2fms (avg: %.2fms->%.2fms)", 
-			url, relay.SuccessfulAttempts, relay.TotalAttempts, 
+
+		log.Printf("[MANAGER] Health update SUCCESS: %s | attempts=%d/%d | responseTime=%.2fms (avg: %.2fms->%.2fms)",
+			url, relay.SuccessfulAttempts, relay.TotalAttempts,
 			responseTime.Seconds()*1000, oldAvgTime.Seconds()*1000, relay.AvgResponseTime.Seconds()*1000)
 	} else {
-		log.Printf("[MANAGER] Health update FAILED: %s | attempts=%d/%d", 
+		log.Printf("[MANAGER] Health update FAILED: %s | attempts=%d/%d",
 			url, relay.SuccessfulAttempts, relay.TotalAttempts)
 	}
 
@@ -98,13 +98,13 @@ func (m *Manager) UpdateHealth(url string, success bool, responseTime time.Durat
 			successValue = 1.0
 		}
 		relay.SuccessRate = relay.SuccessRate*m.decay + successValue*(1-m.decay)
-		log.Printf("[MANAGER] Success rate updated (exponential decay): %s | %.4f -> %.4f", 
+		log.Printf("[MANAGER] Success rate updated (exponential decay): %s | %.4f -> %.4f",
 			url, oldSuccessRate, relay.SuccessRate)
 	} else {
 		// During initialization, use simple success rate
 		if relay.TotalAttempts > 0 {
 			relay.SuccessRate = float64(relay.SuccessfulAttempts) / float64(relay.TotalAttempts)
-			log.Printf("[MANAGER] Success rate updated (simple): %s | %.4f -> %.4f", 
+			log.Printf("[MANAGER] Success rate updated (simple): %s | %.4f -> %.4f",
 				url, oldSuccessRate, relay.SuccessRate)
 		}
 	}

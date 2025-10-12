@@ -19,7 +19,7 @@ type Config struct {
 
 func Load() *Config {
 	return &Config{
-		SeedRelays:          parseSeedRelays(getEnv("SEED_RELAYS", "")),
+		SeedRelays:          parseSeedRelays(getEnv("SEED_RELAYS", "ws://localhost:10547")),
 		TopNRelays:          getEnvInt("TOP_N_RELAYS", 50),
 		RelayPort:           getEnv("RELAY_PORT", "3334"),
 		RefreshInterval:     getEnvDuration("REFRESH_INTERVAL", 24*time.Hour),

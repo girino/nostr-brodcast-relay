@@ -26,7 +26,7 @@ func NewChecker(mgr *manager.Manager, initialTimeout time.Duration) *Checker {
 // CheckInitial performs initial timeout-based health check on a relay
 func (c *Checker) CheckInitial(url string) bool {
 	log.Printf("[HEALTH] Testing relay: %s", url)
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), c.initialTimeout)
 	defer cancel()
 
@@ -41,7 +41,7 @@ func (c *Checker) CheckInitial(url string) bool {
 	defer relay.Close()
 
 	elapsed := time.Since(start)
-	
+
 	// Consider it successful if we connected
 	c.manager.UpdateHealth(url, true, elapsed)
 	log.Printf("[HEALTH] SUCCESS: %s | time=%.2fms", url, elapsed.Seconds()*1000)
@@ -52,7 +52,7 @@ func (c *Checker) CheckInitial(url string) bool {
 func (c *Checker) CheckBatch(urls []string) {
 	log.Printf("[HEALTH] ========== Starting batch health check ==========")
 	log.Printf("[HEALTH] Testing %d relays (max 20 concurrent)", len(urls))
-	
+
 	sem := make(chan struct{}, 20) // Limit concurrent checks
 	var wg sync.WaitGroup
 	successCount := 0
@@ -60,14 +60,14 @@ func (c *Checker) CheckBatch(urls []string) {
 	var mu sync.Mutex
 
 	start := time.Now()
-	
+
 	for _, url := range urls {
 		wg.Add(1)
 		go func(u string) {
 			defer wg.Done()
 			sem <- struct{}{}        // Acquire semaphore
 			defer func() { <-sem }() // Release semaphore
-			
+
 			success := c.CheckInitial(u)
 			mu.Lock()
 			if success {
@@ -81,7 +81,7 @@ func (c *Checker) CheckBatch(urls []string) {
 
 	wg.Wait()
 	elapsed := time.Since(start)
-	
+
 	log.Printf("[HEALTH] ========== Batch check complete ==========")
 	log.Printf("[HEALTH] Results: %d success, %d failed out of %d total", successCount, failCount, len(urls))
 	log.Printf("[HEALTH] Total time: %.2fs", elapsed.Seconds())

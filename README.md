@@ -90,7 +90,9 @@ source .env
 
 2. Or set variables directly:
 
-### Required Configuration
+### Configuration
+
+The relay uses `ws://localhost:10547` (nak debug relay) as the default seed relay. For production use, you should set real Nostr relays:
 
 ```bash
 export SEED_RELAYS="wss://relay.damus.io,wss://relay.nostr.band,wss://nos.lol"
@@ -111,6 +113,12 @@ export SUCCESS_RATE_DECAY=0.95      # Exponential decay factor (default: 0.95)
 
 ### Starting the Relay
 
+With default settings (uses nak debug relay at `ws://localhost:10547`):
+```bash
+./broadcast-relay
+```
+
+Or with custom seed relays:
 ```bash
 export SEED_RELAYS="wss://relay.damus.io,wss://relay.nostr.band,wss://nos.lol"
 ./broadcast-relay

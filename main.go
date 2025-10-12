@@ -37,10 +37,6 @@ func main() {
 	log.Printf("[CONFIG]   - Success rate decay: %.2f", cfg.SuccessRateDecay)
 	log.Println("")
 
-	if len(cfg.SeedRelays) == 0 {
-		log.Fatal("FATAL: No seed relays provided. Set SEED_RELAYS environment variable.")
-	}
-
 	// Initialize components
 	log.Println("[MAIN] Initializing components...")
 	mgr := manager.NewManager(cfg.TopNRelays, cfg.SuccessRateDecay)
@@ -67,7 +63,7 @@ func main() {
 	for i, r := range topRelays {
 		if i < 10 { // Show top 10
 			log.Printf("[MAIN]   %d. %s", i+1, r.URL)
-			log.Printf("[MAIN]      Success: %.2f%%, Avg time: %.2fms, Attempts: %d", 
+			log.Printf("[MAIN]      Success: %.2f%%, Avg time: %.2fms, Attempts: %d",
 				r.SuccessRate*100, float64(r.AvgResponseTime.Milliseconds()), r.TotalAttempts)
 		}
 	}
@@ -108,7 +104,7 @@ func main() {
 	log.Println("==============================================================")
 	log.Println("=== SHUTTING DOWN GRACEFULLY ===")
 	log.Println("==============================================================")
-	
+
 	// Print final stats
 	stats := bc.GetStats()
 	log.Printf("[MAIN] Final stats:")
@@ -129,14 +125,14 @@ func startPeriodicRefresh(ctx context.Context, cfg *config.Config, disc *discove
 			log.Println("==============================================================")
 			log.Println("[REFRESH] === STARTING PERIODIC RELAY REFRESH ===")
 			log.Println("==============================================================")
-			
+
 			disc.DiscoverFromSeeds(ctx, cfg.SeedRelays)
-			
+
 			topRelays := mgr.GetTopRelays()
 			log.Printf("[REFRESH] Refresh complete: %d top relays from %d total relays", len(topRelays), mgr.GetRelayCount())
 			log.Println("==============================================================")
 			log.Println("")
-			
+
 		case <-ctx.Done():
 			log.Println("[REFRESH] Periodic refresh stopped")
 			return

@@ -2,12 +2,14 @@
 
 The broadcast relay is configured using environment variables. Below are all available configuration options:
 
-## Required Configuration
+## Configuration
 
 ### SEED_RELAYS
-**Required**
+**Default:** `ws://localhost:10547`
 
 Comma-separated list of seed relay URLs. These relays will be used for initial discovery and periodic refresh.
+
+The default uses the nak debug relay running on localhost. For production, you should set this to real Nostr relays.
 
 Example:
 ```bash
@@ -78,7 +80,7 @@ export SUCCESS_RATE_DECAY=0.95
 
 ## Quick Start
 
-1. Set your seed relays:
+1. (Optional) Set your seed relays. The default is `ws://localhost:10547` (nak debug relay):
 ```bash
 export SEED_RELAYS="wss://relay.damus.io,wss://relay.nostr.band,wss://nos.lol"
 ```
