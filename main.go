@@ -37,25 +37,19 @@ func main() {
 	log.Println("")
 	log.Println("[CONFIG] Configuration loaded:")
 	log.Printf("[CONFIG]   - Seed relays: %d", len(cfg.SeedRelays))
-	if verbose {
-		for i, seed := range cfg.SeedRelays {
-			log.Printf("[CONFIG]     %d. %s", i+1, seed)
-		}
+	for i, seed := range cfg.SeedRelays {
+		logging.LogV("[CONFIG]     %d. %s", i+1, seed)
 	}
 	log.Printf("[CONFIG]   - Mandatory relays: %d", len(cfg.MandatoryRelays))
-	if verbose && len(cfg.MandatoryRelays) > 0 {
-		for i, relay := range cfg.MandatoryRelays {
-			log.Printf("[CONFIG]     %d. %s", i+1, relay)
-		}
+	for i, relay := range cfg.MandatoryRelays {
+		logging.LogV("[CONFIG]     %d. %s", i+1, relay)
 	}
 	log.Printf("[CONFIG]   - Top N relays: %d", cfg.TopNRelays)
 	log.Printf("[CONFIG]   - Relay port: %s", cfg.RelayPort)
-	if verbose {
-		log.Printf("[CONFIG]   - Refresh interval: %v", cfg.RefreshInterval)
-		log.Printf("[CONFIG]   - Health check interval: %v", cfg.HealthCheckInterval)
-		log.Printf("[CONFIG]   - Initial timeout: %v", cfg.InitialTimeout)
-		log.Printf("[CONFIG]   - Success rate decay: %.2f", cfg.SuccessRateDecay)
-	}
+	logging.LogV("[CONFIG]   - Refresh interval: %v", cfg.RefreshInterval)
+	logging.LogV("[CONFIG]   - Health check interval: %v", cfg.HealthCheckInterval)
+	logging.LogV("[CONFIG]   - Initial timeout: %v", cfg.InitialTimeout)
+	logging.LogV("[CONFIG]   - Success rate decay: %.2f", cfg.SuccessRateDecay)
 	log.Println("")
 
 	// Initialize components
@@ -80,14 +74,12 @@ func main() {
 	log.Println("[MAIN] ========== PHASE 2: INITIAL RELAY SELECTION ==========")
 	topRelays := mgr.GetTopRelays()
 	log.Printf("[MAIN] Selected top %d relays from %d total relays", len(topRelays), mgr.GetRelayCount())
-	if verbose {
-		log.Println("[MAIN] Top 10 relays:")
-		for i, r := range topRelays {
-			if i < 10 { // Show top 10
-				log.Printf("[MAIN]   %d. %s", i+1, r.URL)
-				log.Printf("[MAIN]      Success: %.2f%%, Avg time: %.2fms, Attempts: %d",
-					r.SuccessRate*100, float64(r.AvgResponseTime.Milliseconds()), r.TotalAttempts)
-			}
+	logging.LogV("[MAIN] Top 10 relays:")
+	for i, r := range topRelays {
+		if i < 10 { // Show top 10
+			logging.LogV("[MAIN]   %d. %s", i+1, r.URL)
+			logging.LogV("[MAIN]      Success: %.2f%%, Avg time: %.2fms, Attempts: %d",
+				r.SuccessRate*100, float64(r.AvgResponseTime.Milliseconds()), r.TotalAttempts)
 		}
 	}
 	log.Println("")
