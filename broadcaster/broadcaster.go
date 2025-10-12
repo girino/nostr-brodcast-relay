@@ -37,7 +37,7 @@ type Broadcaster struct {
 }
 
 func NewBroadcaster(mgr *manager.Manager, checker *health.Checker, mandatoryRelays []string, workerCount int) *Broadcaster {
-	logging.Debug("Broadcaster: Initializing broadcaster with %d workers", workerCount)
+	logging.DebugMethod("broadcaster", "NewBroadcaster", "Initializing broadcaster with %d workers", workerCount)
 	if len(mandatoryRelays) > 0 {
 		logging.Info("Broadcaster: Configured with %d mandatory relays", len(mandatoryRelays))
 	}
@@ -90,16 +90,16 @@ func (b *Broadcaster) Stop() {
 // worker processes events from the queue
 func (b *Broadcaster) worker(id int) {
 	defer b.wg.Done()
-	logging.Debug("Broadcaster: Worker %d started", id)
+	logging.DebugMethod("broadcaster", "worker", "Worker %d started", id)
 
 	for {
 		select {
 		case <-b.ctx.Done():
-			logging.Debug("Broadcaster: Worker %d shutting down (context cancelled)", id)
+			logging.DebugMethod("broadcaster", "worker", "Worker %d shutting down (context cancelled)", id)
 			return
 		case event, ok := <-b.eventQueue:
 			if !ok {
-				logging.Debug("Broadcaster: Worker %d shutting down (queue closed)", id)
+				logging.DebugMethod("broadcaster", "worker", "Worker %d shutting down (queue closed)", id)
 				return
 			}
 			// Decrement total queued count
@@ -185,7 +185,7 @@ func (b *Broadcaster) Broadcast(event *nostr.Event) {
 
 	// Check if event was already broadcast (prevent recursion/duplicates)
 	if b.isEventCached(event.ID) {
-		logging.Debug("Broadcaster: Event %s (kind %d) already broadcast, skipping (cache hit)", event.ID, event.Kind)
+		logging.DebugMethod("broadcaster", "Broadcast", "Event %s (kind %d) already broadcast, skipping (cache hit)", event.ID, event.Kind)
 		return
 	}
 
@@ -197,7 +197,7 @@ func (b *Broadcaster) Broadcast(event *nostr.Event) {
 	case b.eventQueue <- event:
 		// Successfully queued to channel
 		newTotal := atomic.AddInt64(&b.totalQueued, 1)
-		logging.Debug("Broadcaster: Event %s (kind %d) queued to channel (total: %d)",
+		logging.DebugMethod("broadcaster", "Broadcast", "Event %s (kind %d) queued to channel (total: %d)",
 			event.ID, event.Kind, newTotal)
 
 		// Update peak size
@@ -225,7 +225,7 @@ func (b *Broadcaster) Broadcast(event *nostr.Event) {
 				len(b.eventQueue), b.channelCapacity)
 		}
 
-		logging.Debug("Broadcaster: Event %s (kind %d) queued to overflow (overflow: %d, total: %d)",
+		logging.DebugMethod("broadcaster", "Broadcast", "Event %s (kind %d) queued to overflow (overflow: %d, total: %d)",
 			event.ID, event.Kind, len(b.overflowQueue), newTotal)
 
 		// Update peak size
@@ -266,7 +266,7 @@ func (b *Broadcaster) broadcastEvent(event *nostr.Event) {
 		return
 	}
 
-	logging.Debug("Broadcaster: Broadcasting event %s (kind %d) to %d relays (%d mandatory + %d top)",
+	logging.DebugMethod("broadcaster", "broadcastEvent", "Broadcasting event %s (kind %d) to %d relays (%d mandatory + %d top)",
 		event.ID, event.Kind, len(broadcastRelays), len(b.mandatoryRelays), len(topRelays))
 
 	var wg sync.WaitGroup
@@ -292,7 +292,7 @@ func (b *Broadcaster) broadcastEvent(event *nostr.Event) {
 	// Track results in background
 	go func() {
 		wg.Wait()
-		logging.Debug("Broadcaster: Broadcast complete for event %s | success=%d, failed=%d, total=%d",
+		logging.DebugMethod("broadcaster", "broadcastEvent", "Broadcast complete for event %s | success=%d, failed=%d, total=%d",
 			event.ID, successCount, failCount, len(broadcastRelays))
 	}()
 }
@@ -306,7 +306,7 @@ func (b *Broadcaster) publishToRelay(url string, event *nostr.Event) bool {
 
 	relay, err := nostr.RelayConnect(ctx, url)
 	if err != nil {
-		logging.Debug("Broadcaster: Failed to connect to %s: %v", url, err)
+		logging.DebugMethod("broadcaster", "publishToRelay", "Failed to connect to %s: %v", url, err)
 		b.checker.TrackPublishResult(health.PublishResult{
 			URL:          url,
 			Success:      false,
@@ -330,10 +330,10 @@ func (b *Broadcaster) publishToRelay(url string, event *nostr.Event) bool {
 	})
 
 	if success {
-		logging.Debug("Broadcaster: Published event %s to %s (%.2fms)",
+		logging.DebugMethod("broadcaster", "publishToRelay", "Published event %s to %s (%.2fms)",
 			event.ID, url, elapsed.Seconds()*1000)
 	} else {
-		logging.Debug("Broadcaster: Failed to publish to %s: %v (%.2fms)",
+		logging.DebugMethod("broadcaster", "publishToRelay", "Failed to publish to %s: %v (%.2fms)",
 			url, err, elapsed.Seconds()*1000)
 	}
 

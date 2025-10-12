@@ -16,7 +16,7 @@ type Checker struct {
 }
 
 func NewChecker(mgr *manager.Manager, initialTimeout time.Duration) *Checker {
-	logging.DebugModule("health", "Initializing health checker with timeout=%v", initialTimeout)
+	logging.DebugMethod("health", "NewChecker", "Initializing health checker with timeout=%v", initialTimeout)
 	return &Checker{
 		manager:        mgr,
 		initialTimeout: initialTimeout,
@@ -25,7 +25,7 @@ func NewChecker(mgr *manager.Manager, initialTimeout time.Duration) *Checker {
 
 // CheckInitial performs initial timeout-based health check on a relay
 func (c *Checker) CheckInitial(url string) bool {
-	logging.DebugModule("health", "Testing relay: %s", url)
+	logging.DebugMethod("health", "CheckInitial", "Testing relay: %s", url)
 
 	ctx, cancel := context.WithTimeout(context.Background(), c.initialTimeout)
 	defer cancel()
@@ -34,7 +34,7 @@ func (c *Checker) CheckInitial(url string) bool {
 	relay, err := nostr.RelayConnect(ctx, url)
 	if err != nil {
 		elapsed := time.Since(start)
-		logging.DebugModule("health", "Failed to connect to %s | error=%v | time=%.2fms", url, err, elapsed.Seconds()*1000)
+		logging.DebugMethod("health", "CheckInitial", "Failed to connect to %s | error=%v | time=%.2fms", url, err, elapsed.Seconds()*1000)
 		c.manager.UpdateHealth(url, false, 0)
 		return false
 	}
@@ -44,13 +44,13 @@ func (c *Checker) CheckInitial(url string) bool {
 
 	// Consider it successful if we connected
 	c.manager.UpdateHealth(url, true, elapsed)
-	logging.DebugModule("health", "Connected successfully to %s | time=%.2fms", url, elapsed.Seconds()*1000)
+	logging.DebugMethod("health", "CheckInitial", "Connected successfully to %s | time=%.2fms", url, elapsed.Seconds()*1000)
 	return true
 }
 
 // CheckBatch performs initial checks on multiple relays concurrently
 func (c *Checker) CheckBatch(urls []string) {
-	logging.DebugModule("health", "Starting batch health check of %d relays (max 20 concurrent)", len(urls))
+	logging.DebugMethod("health", "CheckBatch", "Starting batch health check of %d relays (max 20 concurrent)", len(urls))
 
 	sem := make(chan struct{}, 20) // Limit concurrent checks
 	var wg sync.WaitGroup
@@ -99,6 +99,6 @@ func (c *Checker) TrackPublishResult(result PublishResult) {
 	c.manager.UpdateHealth(result.URL, result.Success, result.ResponseTime)
 
 	if !result.Success && result.Error != nil {
-		logging.DebugModule("health", "Publish to %s failed: %v", result.URL, result.Error)
+		logging.DebugMethod("health", "TrackPublishResult", "Publish to %s failed: %v", result.URL, result.Error)
 	}
 }

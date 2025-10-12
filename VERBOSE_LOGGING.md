@@ -89,14 +89,11 @@ Method-level logs:
 To add granular logging to your code:
 
 ```go
-// Module-level debug log
-logging.DebugModule("mymodule", "Something happened: %v", value)
-
-// Method-level debug log
+// Debug log with module and method
 logging.DebugMethod("mymodule", "myMethod", "Processing %s", item)
 
-// Traditional verbose log (only works with --verbose true)
-logging.Debug("Legacy verbose message")
+// Always specify both module and method for better traceability
+logging.DebugMethod("broadcaster", "addEventToCache", "Adding event %s to cache", eventID)
 ```
 
 ## Notes

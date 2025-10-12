@@ -67,13 +67,6 @@ func IsVerbose(module string, method string) bool {
 	return false
 }
 
-// DebugModule logs debug messages for a specific module (only in verbose mode)
-func DebugModule(module string, format string, v ...interface{}) {
-	if IsVerbose(module, "") {
-		log.Printf("[DEBUG] "+module+": "+format, v...)
-	}
-}
-
 // DebugMethod logs debug messages for a specific module.method (only in verbose mode)
 func DebugMethod(module string, method string, format string, v ...interface{}) {
 	if IsVerbose(module, method) {
@@ -81,7 +74,8 @@ func DebugMethod(module string, method string, format string, v ...interface{}) 
 	}
 }
 
-// Debug logs debug messages (only in verbose mode) - backward compatibility
+// Debug logs debug messages (deprecated - only works with --verbose true)
+// Use DebugMethod instead for better granular control
 func Debug(format string, v ...interface{}) {
 	if verboseAll {
 		log.Printf("[DEBUG] "+format, v...)

@@ -40,7 +40,7 @@ func Load() *Config {
 		WorkerCount:         workerCount,
 	}
 
-	logging.DebugModule("config", "Loaded configuration: SeedRelays=%d, MandatoryRelays=%d, TopN=%d, Port=%s, Workers=%d",
+	logging.DebugMethod("config", "Load", "Loaded configuration: SeedRelays=%d, MandatoryRelays=%d, TopN=%d, Port=%s, Workers=%d",
 		len(cfg.SeedRelays), len(cfg.MandatoryRelays), cfg.TopNRelays, cfg.RelayPort, cfg.WorkerCount)
 
 	return cfg
