@@ -51,17 +51,17 @@ func (r *Relay) setupRelay() {
 		},
 	)
 
-	// Handle incoming events
+	// Handle incoming events (both regular and ephemeral)
 	relay.OnEventSaved = append(relay.OnEventSaved,
 		func(ctx context.Context, event *nostr.Event) {
 			r.handleEvent(event)
 		},
 	)
 
-	// Handle ephemeral events (kinds 20000-29999)
+	// Handle ephemeral events (kinds 20000-29999) with the same handler
 	relay.OnEphemeralEvent = append(relay.OnEphemeralEvent,
 		func(ctx context.Context, event *nostr.Event) {
-			r.handleEphemeralEvent(event)
+			r.handleEvent(event)
 		},
 	)
 
@@ -99,7 +99,7 @@ func (r *Relay) setupRelay() {
 }
 
 func (r *Relay) handleEvent(event *nostr.Event) {
-	// Extract relay URLs from the event
+	// Extract relay URLs from the event (works for all event kinds)
 	relays := r.discovery.ExtractRelaysFromEvent(event)
 
 	for _, relayURL := range relays {
@@ -107,26 +107,10 @@ func (r *Relay) handleEvent(event *nostr.Event) {
 	}
 
 	if len(relays) > 0 {
-		log.Printf("Extracted %d relay URLs from event %s", len(relays), event.ID)
+		log.Printf("Extracted %d relay URLs from event %s (kind %d)", len(relays), event.ID, event.Kind)
 	}
 
 	// Broadcast the event to top N relays
-	r.broadcaster.Broadcast(event)
-}
-
-func (r *Relay) handleEphemeralEvent(event *nostr.Event) {
-	// Extract relay URLs from ephemeral events for discovery
-	relays := r.discovery.ExtractRelaysFromEvent(event)
-
-	for _, relayURL := range relays {
-		r.discovery.AddRelayIfNew(relayURL)
-	}
-
-	if len(relays) > 0 {
-		log.Printf("Extracted %d relay URLs from ephemeral event %s (kind %d)", len(relays), event.ID, event.Kind)
-	}
-
-	// Broadcast ephemeral events just like any other event
 	r.broadcaster.Broadcast(event)
 }
 
