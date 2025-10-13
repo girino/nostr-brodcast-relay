@@ -39,6 +39,9 @@ Thumbs.db
 # Plan files
 *.plan.md
 
+# Working/temporary documentation
+notes/
+
 # Tor hidden service data and sensitive files
 tor-data/
 tor-config/
