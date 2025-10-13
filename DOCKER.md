@@ -20,7 +20,7 @@ docker-compose -f docker-compose.prod.yml up -d
 docker-compose -f docker-compose.prod.yml logs -f
 
 # Get your Tor hidden service address (wait ~30s for Tor to bootstrap)
-docker exec broadcast-relay-tor cat /var/lib/tor/hidden_service/relay/hostname
+docker exec broadcast-relay-tor cat /var/lib/tor/hidden_service/hostname
 ```
 
 ## Configuration
@@ -78,10 +78,10 @@ Provides a .onion address for anonymous access.
 **Get your .onion address**:
 ```bash
 # Using docker exec
-docker exec broadcast-relay-tor cat /var/lib/tor/hidden_service/relay/hostname
+docker exec broadcast-relay-tor cat /var/lib/tor/hidden_service/hostname
 
 # Or using docker-compose
-docker-compose -f docker-compose.prod.yml exec tor cat /var/lib/tor/hidden_service/relay/hostname
+docker-compose -f docker-compose.prod.yml exec tor cat /var/lib/tor/hidden_service/hostname
 ```
 
 **Example output**: `abcd1234efgh5678ijklmnop.onion`
@@ -268,7 +268,7 @@ docker exec broadcast-relay wget -qO- http://localhost:3334/stats
    ```
 3. **Get your .onion address** (wait ~60s for Tor bootstrap):
    ```bash
-   docker exec broadcast-relay-tor cat /var/lib/tor/hidden_service/relay/hostname
+   docker exec broadcast-relay-tor cat /var/lib/tor/hidden_service/hostname
    ```
 4. **Backup Tor keys**:
    ```bash
@@ -326,7 +326,7 @@ docker-compose -f docker-compose.prod.yml logs tor
 docker-compose -f docker-compose.prod.yml restart tor
 
 # Wait 30 seconds, then check
-docker exec broadcast-relay-tor cat /var/lib/tor/hidden_service/relay/hostname
+docker exec broadcast-relay-tor cat /var/lib/tor/hidden_service/hostname
 ```
 
 ### Connection issues

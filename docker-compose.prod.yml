@@ -47,24 +47,21 @@ services:
         max-file: "3"
 
   tor:
-    image: goldy/tor-hidden-service:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.tor
     container_name: broadcast-relay-tor
     restart: unless-stopped
     depends_on:
       relay:
         condition: service_healthy
-    environment:
-      # Hidden service configuration
-      # Format: SERVICE_NAME_HOSTS=port:target:targetport
-      - RELAY_HOSTS=80:relay:3334
-      - RELAY_VERSION=3
     volumes:
       # Persist Tor hidden service keys
       - tor-data:/var/lib/tor/hidden_service/
     networks:
       - relay-network
     healthcheck:
-      test: ["CMD", "sh", "-c", "test -f /var/lib/tor/hidden_service/relay/hostname && pgrep tor"]
+      test: ["CMD", "sh", "-c", "test -f /var/lib/tor/hidden_service/hostname && pgrep tor"]
       interval: 30s
       timeout: 10s
       retries: 3

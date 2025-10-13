@@ -1,0 +1,22 @@
+FROM alpine:latest
+
+# Install Tor
+RUN apk --no-cache add tor
+
+# Create directory for hidden service
+RUN mkdir -p /var/lib/tor/hidden_service && \
+    chown -R tor:tor /var/lib/tor
+
+# Create Tor configuration
+RUN echo "HiddenServiceDir /var/lib/tor/hidden_service/" > /etc/tor/torrc && \
+    echo "HiddenServicePort 80 relay:3334" >> /etc/tor/torrc && \
+    echo "HiddenServiceVersion 3" >> /etc/tor/torrc && \
+    echo "SocksPort 0" >> /etc/tor/torrc && \
+    echo "Log notice stdout" >> /etc/tor/torrc
+
+# Use tor user
+USER tor
+
+# Run Tor
+CMD ["tor", "-f", "/etc/tor/torrc"]
+
