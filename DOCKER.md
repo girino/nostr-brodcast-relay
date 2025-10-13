@@ -13,14 +13,14 @@ docker build -t broadcast-relay:latest .
 ### 2. Run with Docker Compose (Production)
 
 ```bash
-# Start all services (relay + Tor)
+# Start all services (relay + Tor + autoheal)
 docker-compose -f docker-compose.prod.yml up -d
 
 # View logs
 docker-compose -f docker-compose.prod.yml logs -f
 
-# Get your Tor hidden service address
-cat tor-data/hostname
+# Get your Tor hidden service address (wait ~30s for Tor to bootstrap)
+docker exec broadcast-relay-tor cat /var/lib/tor/hidden_service/relay/hostname
 ```
 
 ## Configuration
@@ -77,12 +77,16 @@ Provides a .onion address for anonymous access.
 
 **Get your .onion address**:
 ```bash
-cat tor-data/hostname
+# Using docker exec
+docker exec broadcast-relay-tor cat /var/lib/tor/hidden_service/relay/hostname
+
+# Or using docker-compose
+docker-compose -f docker-compose.prod.yml exec tor cat /var/lib/tor/hidden_service/relay/hostname
 ```
 
-**Example output**: `abcd1234efgh5678.onion`
+**Example output**: `abcd1234efgh5678ijklmnop.onion`
 
-Your relay will be accessible at: `ws://abcd1234efgh5678.onion:80`
+Your relay will be accessible at: `ws://abcd1234efgh5678ijklmnop.onion:80`
 
 ### Nginx Reverse Proxy (Optional - Host Installation)
 
@@ -157,24 +161,38 @@ cat tor-data/hostname
 
 ### Persistence
 
-Tor keys are stored in `./tor-data/`. Keep this directory safe!
+Tor keys are stored in a Docker named volume `tor-data`. Keep this safe!
 
-- **Backup**: Copy the entire `tor-data/` directory
-- **Restore**: Place your backup in `tor-data/` before starting
-- **New Address**: Delete `tor-data/` to generate a new .onion address
+**Backup**:
+```bash
+# Export volume to tar file
+docker run --rm -v broadcast-relay_tor-data:/data -v $(pwd):/backup alpine tar czf /backup/tor-backup.tar.gz -C /data .
+```
+
+**Restore**:
+```bash
+# Import from tar file
+docker run --rm -v broadcast-relay_tor-data:/data -v $(pwd):/backup alpine tar xzf /backup/tor-backup.tar.gz -C /data
+```
+
+**New Address**:
+```bash
+# Remove volume to generate new .onion address
+docker-compose -f docker-compose.prod.yml down
+docker volume rm broadcast-relay_tor-data
+docker-compose -f docker-compose.prod.yml up -d
+```
 
 ## Security
 
 ### Tor Data Protection
 
-The following files are automatically excluded from git (`.gitignore`):
+The Tor hidden service data is stored in a Docker named volume, not on the filesystem. This provides:
+- Better security (isolated from host filesystem)
+- Automatic permissions management
+- No risk of accidentally committing sensitive files to git
 
-- `tor-data/` - Tor hidden service keys
-- `hostname` - Your .onion address
-- `private_key`, `hs_ed25519_secret_key` - Tor secret keys
-- `nginx.conf` - May contain sensitive configuration
-
-**⚠️ NEVER commit these files to version control!**
+**⚠️ Always backup your Tor volume** before updating or removing containers!
 
 ### Non-Root Execution
 
@@ -248,13 +266,13 @@ docker exec broadcast-relay wget -qO- http://localhost:3334/stats
    ```bash
    docker-compose -f docker-compose.prod.yml up -d
    ```
-3. **Backup Tor keys**:
+3. **Get your .onion address** (wait ~60s for Tor bootstrap):
    ```bash
-   tar -czf tor-backup.tar.gz tor-data/
+   docker exec broadcast-relay-tor cat /var/lib/tor/hidden_service/relay/hostname
    ```
-4. **Share your .onion address**:
+4. **Backup Tor keys**:
    ```bash
-   echo "My relay: ws://$(cat tor-data/hostname):80"
+   docker run --rm -v broadcast-relay_tor-data:/data -v $(pwd):/backup alpine tar czf /backup/tor-backup.tar.gz -C /data .
    ```
 
 ### Updates
@@ -308,7 +326,7 @@ docker-compose -f docker-compose.prod.yml logs tor
 docker-compose -f docker-compose.prod.yml restart tor
 
 # Wait 30 seconds, then check
-cat tor-data/hostname
+docker exec broadcast-relay-tor cat /var/lib/tor/hidden_service/relay/hostname
 ```
 
 ### Connection issues
