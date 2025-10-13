@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-rc2] - 2025-10-13
+
+Second release candidate for v1.0.0 stable release.
+
+### Fixed
+- CI workflow test command simplified (removed covdata tool dependency)
+- GitHub Actions workflows now pass successfully
+
+### Changed
+- Contact pubkey defaults to relay pubkey if not configured
+- Main page always shows relay and contact information
+
 ## [1.0.0-rc1] - 2025-10-13
 
 First release candidate for v1.0.0 stable release.

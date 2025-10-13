@@ -89,7 +89,7 @@ func (r *Relay) setupRelay() {
 	relay.Info.Contact = contactPubkey
 	relay.Info.SupportedNIPs = []any{1, 11}
 	relay.Info.Software = "https://gitworkshop.dev/girino@girino.org/broadcast-relay"
-	relay.Info.Version = "1.0.0-rc1"
+	relay.Info.Version = "1.0.0-rc2"
 	relay.Info.Icon = r.config.RelayIcon
 
 	// Note: Banner is shown on main page but not in NIP-11 (not a standard field)
