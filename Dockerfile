@@ -17,8 +17,8 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build the application
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags="-w -s" -o broadcast-relay .
+# Build the application (GOOS and GOARCH set by buildx for target platform)
+RUN CGO_ENABLED=0 go build -a -installsuffix cgo -ldflags="-w -s" -o broadcast-relay .
 
 # Final stage - minimal runtime image
 FROM alpine:latest
