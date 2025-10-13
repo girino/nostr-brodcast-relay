@@ -75,9 +75,9 @@ Provides a .onion address for anonymous access.
 
 **Health Check**: 
 - Verifies hostname file exists (hidden service created)
-- Tests actual Tor connectivity through SOCKS proxy
-- Queries Tor Project API to confirm traffic is routed through Tor
-- More reliable than just checking if process is running
+- Confirms Tor process is running
+- Checks SOCKS port 9050 is listening
+- More comprehensive than just process check
 
 **Get your .onion address**:
 ```bash
@@ -209,10 +209,10 @@ The relay runs as a non-root user (`relay:relay`, UID/GID 1000) inside the conta
 All Docker services have health checks configured:
 
 - **Relay**: Checks `/stats` endpoint every 30s
-- **Tor**: Tests actual Tor connectivity every 60s
-  - Verifies hidden service hostname file exists
-  - Queries Tor Project API through SOCKS proxy
-  - Confirms traffic is routed through Tor network
+- **Tor**: Verifies Tor is properly configured every 30s
+  - Checks hidden service hostname file exists
+  - Confirms Tor process is running
+  - Verifies SOCKS port 9050 is listening
 - **Autoheal**: Monitors all containers and auto-restarts unhealthy ones
 
 **Note**: Nginx runs on the host and is monitored by systemd
