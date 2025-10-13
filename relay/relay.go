@@ -88,7 +88,7 @@ func (r *Relay) setupRelay() {
 	relay.Info.PubKey = relayPubkey
 	relay.Info.Contact = contactPubkey
 	relay.Info.SupportedNIPs = []any{1, 11}
-	relay.Info.Software = "https://github.com/girino/broadcast-relay"
+	relay.Info.Software = "https://gitworkshop.dev/girino@girino.org/broadcast-relay"
 	relay.Info.Version = "0.2.0-rc1"
 	relay.Info.Icon = r.config.RelayIcon
 

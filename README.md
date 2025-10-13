@@ -52,8 +52,12 @@ Broadcast Relay is a **zero-storage Nostr relay** that accepts your events and i
 
 ```bash
 # Clone the repository
-git clone https://github.com/girino/nostr-brodcast-relay.git
-cd nostr-brodcast-relay
+git clone nostr://npub18lav8fkgt8424rxamvk8qq4xuy9n8mltjtgztv2w44hc5tt9vets0hcfsz/relay.ngit.dev/broadcast-relay
+cd broadcast-relay
+
+# Or via HTTPS
+git clone https://gitworkshop.dev/girino@girino.org/broadcast-relay
+cd broadcast-relay
 
 # Start the relay (includes Tor hidden service)
 docker-compose -f docker-compose.prod.yml up -d
@@ -77,7 +81,7 @@ Your relay is now running! 🎉
 go version
 
 # Clone and build
-git clone https://github.com/girino/nostr-brodcast-relay.git
+git clone https://gitworkshop.dev/girino@girino.org/broadcast-relay.git
 cd nostr-brodcast-relay
 go build -o broadcast-relay .
 
@@ -192,7 +196,7 @@ Beautiful web interface showing:
 
 ```bash
 # Clone repository
-git clone https://github.com/girino/nostr-brodcast-relay.git
+git clone https://gitworkshop.dev/girino@girino.org/broadcast-relay.git
 cd nostr-brodcast-relay
 
 # Download dependencies
@@ -521,7 +525,7 @@ CACHE_TTL=30s
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/girino/nostr-brodcast-relay.git
+git clone https://gitworkshop.dev/girino@girino.org/broadcast-relay.git
 cd nostr-brodcast-relay
 
 # 2. Configure environment
@@ -723,7 +727,7 @@ Granular control over debug output:
 
 ### Contribution Process
 
-1. Check [existing issues](https://github.com/girino/nostr-brodcast-relay/issues)
+1. Check [existing issues](https://gitworkshop.dev/girino@girino.org/broadcast-relay/issues)
 2. Open an issue for discussion (for major changes)
 3. Fork and create feature branch
 4. Make changes with clear commits
@@ -790,15 +794,16 @@ In brief: Do whatever you want with this code. No restrictions, no warranty.
 
 ## Links
 
-- **Repository:** https://github.com/girino/nostr-brodcast-relay
+- **Repository (Nostr):** `nostr://npub18lav8fkgt8424rxamvk8qq4xuy9n8mltjtgztv2w44hc5tt9vets0hcfsz/relay.ngit.dev/broadcast-relay`
+- **Repository (Web):** https://gitworkshop.dev/girino@girino.org/broadcast-relay
 - **License:** https://license.girino.org
 - **Nostr NIPs:** https://github.com/nostr-protocol/nips
 - **Khatru Framework:** https://github.com/fiatjaf/khatru
 
 ## Support
 
-- **Issues:** [GitHub Issues](https://github.com/girino/nostr-brodcast-relay/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/girino/nostr-brodcast-relay/discussions)
+- **Issues:** [Report Issues](https://gitworkshop.dev/girino@girino.org/broadcast-relay/issues)
+- **Discussions:** [Discussions](https://gitworkshop.dev/girino@girino.org/broadcast-relay/discussions)
 - **Nostr:** Contact via relay's contact pubkey
 
 ## Acknowledgments
@@ -814,6 +819,6 @@ In brief: Do whatever you want with this code. No restrictions, no warranty.
 
 **Made with 💜 for the Nostr ecosystem**
 
-[⭐ Star this repo](https://github.com/girino/nostr-brodcast-relay) • [🐛 Report Bug](https://github.com/girino/nostr-brodcast-relay/issues) • [💡 Request Feature](https://github.com/girino/nostr-brodcast-relay/issues)
+[⭐ Star this repo](https://gitworkshop.dev/girino@girino.org/broadcast-relay) • [🐛 Report Bug](https://gitworkshop.dev/girino@girino.org/broadcast-relay/issues) • [💡 Request Feature](https://gitworkshop.dev/girino@girino.org/broadcast-relay/issues)
 
 </div>

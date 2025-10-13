@@ -33,12 +33,17 @@ Thank you for your interest in contributing to Broadcast Relay! This document pr
 ### Fork and Clone
 
 ```bash
-# Fork the repository on GitHub, then:
-git clone https://github.com/YOUR_USERNAME/nostr-brodcast-relay.git
-cd nostr-brodcast-relay
+# Clone the repository
+# Via Nostr (requires Nostr git client)
+git clone nostr://npub18lav8fkgt8424rxamvk8qq4xuy9n8mltjtgztv2w44hc5tt9vets0hcfsz/relay.ngit.dev/broadcast-relay
+cd broadcast-relay
 
-# Add upstream remote
-git remote add upstream https://github.com/girino/nostr-brodcast-relay.git
+# Or via HTTPS
+git clone https://gitworkshop.dev/girino@girino.org/broadcast-relay
+cd broadcast-relay
+
+# Add upstream remote (if forked)
+git remote add upstream nostr://npub18lav8fkgt8424rxamvk8qq4xuy9n8mltjtgztv2w44hc5tt9vets0hcfsz/relay.ngit.dev/broadcast-relay
 
 # Fetch latest changes
 git fetch upstream
@@ -426,8 +431,8 @@ defer mu.Unlock()
 
 ## Questions?
 
-- Open an [issue](https://github.com/girino/nostr-brodcast-relay/issues)
-- Start a [discussion](https://github.com/girino/nostr-brodcast-relay/discussions)
+- Open an [issue](https://gitworkshop.dev/girino@girino.org/broadcast-relay/issues)
+- Start a [discussion](https://gitworkshop.dev/girino@girino.org/broadcast-relay/discussions)
 - Contact maintainer via Nostr
 
 ## Thank You!
