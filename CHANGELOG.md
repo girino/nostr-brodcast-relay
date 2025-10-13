@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-rc1] - 2025-10-13
+
+First release candidate for v1.0.0 stable release.
+
+All features from 0.2.0-rc1 plus:
+- Complete documentation suite
+- GitHub Actions for automated builds
+- Nostr-based git repository
+- Production-ready deployment guides
+
 ## [0.2.0-rc1] - 2025-10-13
 
 ### Added
