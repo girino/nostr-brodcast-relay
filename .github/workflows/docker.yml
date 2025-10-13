@@ -56,8 +56,8 @@ jobs:
             type=ref,event=branch
             # Tag with PR number
             type=ref,event=pr
-            # Tag with git sha (short)
-            type=sha,prefix={{branch}}-
+            # Tag with git sha (short) for branch builds
+            type=sha,enable={{is_default_branch}}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
