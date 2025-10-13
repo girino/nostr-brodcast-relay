@@ -135,12 +135,10 @@
         </div>
         
         <div class="info-section">
-            {{if .URL}}
             <div class="info-item connection-info">
                 <div class="info-label">🌐 Relay Address</div>
                 <div class="info-value ws-url">{{.URL}}</div>
             </div>
-            {{end}}
             
             {{if .RelayNpub}}
             <div class="info-item">

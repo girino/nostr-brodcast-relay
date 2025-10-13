@@ -40,17 +40,39 @@ func NewRelay(cfg *config.Config, bc *broadcaster.Broadcaster, disc *discovery.D
 func (r *Relay) setupRelay() {
 	relay := r.khatru
 
-	// Derive relay pubkey from privkey if provided
+	// Generate or derive relay privkey/pubkey
+	relayPrivkey := r.config.RelayPrivkey
 	relayPubkey := ""
-	if r.config.RelayPrivkey != "" {
-		if _, pubkey, err := nip19.Decode(r.config.RelayPrivkey); err == nil {
-			if sk, ok := pubkey.(string); ok {
+
+	if relayPrivkey != "" {
+		// Decode provided nsec to get private key
+		if _, decoded, err := nip19.Decode(relayPrivkey); err == nil {
+			if sk, ok := decoded.(string); ok {
+				relayPrivkey = sk
 				if pk, err := nostr.GetPublicKey(sk); err == nil {
 					relayPubkey = pk
+					logging.DebugMethod("relay", "setupRelay", "Using provided relay key, pubkey: %s", pk)
 				}
 			}
 		}
+	} else {
+		// Generate a random key
+		relayPrivkey = nostr.GeneratePrivateKey()
+		if pk, err := nostr.GetPublicKey(relayPrivkey); err == nil {
+			relayPubkey = pk
+			logging.Info("Relay: Generated random relay keypair, pubkey: %s", pk)
+		}
 	}
+
+	// Set default URL if not configured
+	relayURL := r.config.RelayURL
+	if relayURL == "" {
+		relayURL = fmt.Sprintf("ws://localhost:%s", r.config.RelayPort)
+		logging.DebugMethod("relay", "setupRelay", "Using default relay URL: %s", relayURL)
+	}
+
+	// Update config with defaults for template rendering
+	r.config.RelayURL = relayURL
 
 	// Set relay metadata from config
 	relay.Info.Name = r.config.RelayName
@@ -292,6 +314,9 @@ func (r *Relay) serveMainPage(w http.ResponseWriter, req *http.Request) {
 		"Version":     r.khatru.Info.Version,
 		"Software":    r.khatru.Info.Software,
 	}
+
+	logging.DebugMethod("relay", "serveMainPage", "Rendering main page: URL=%s, RelayNpub=%s, ContactNpub=%s, Icon=%s, Banner=%s",
+		r.config.RelayURL, relayNpub, contactNpub, r.config.RelayIcon, randomBanner)
 
 	tmpl := template.Must(template.ParseFiles("templates/main.html"))
 	tmpl.Execute(w, data)
