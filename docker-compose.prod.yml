@@ -50,9 +50,6 @@ services:
     image: goldy/tor-hidden-service:latest
     container_name: broadcast-relay-tor
     restart: unless-stopped
-    depends_on:
-      relay:
-        condition: service_healthy
     environment:
       # Hidden service configuration
       # Syntax: {SERVICE}_TOR_SERVICE_HOSTS=port:target:targetport
