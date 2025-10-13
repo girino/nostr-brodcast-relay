@@ -63,8 +63,10 @@ services:
     networks:
       - relay-network
     healthcheck:
-      # Test Tor connectivity by checking Tor API through SOCKS proxy
-      test: ["CMD", "sh", "-c", "test -f /var/lib/tor/hidden_service/relay/hostname && curl --socks5-hostname localhost:9050 --max-time 10 --silent --fail https://check.torproject.org/api/ip | grep -q '\"IsTor\":true'"]
+      # Test Tor connectivity by checking Tor Project API
+      # 1. Hidden service hostname file exists
+      # 2. Test actual Tor connectivity using torsocks + wget
+      test: ["CMD", "sh", "-c", "test -f /var/lib/tor/hidden_service/relay/hostname && torsocks wget -q -O - https://check.torproject.org/api/ip | grep -q '\"IsTor\":true'"]
       interval: 60s
       timeout: 15s
       retries: 3
