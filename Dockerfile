@@ -36,6 +36,10 @@ WORKDIR /app
 # Copy binary from builder
 COPY --from=builder /build/broadcast-relay .
 
+# Copy static assets and templates
+COPY --from=builder /build/static ./static
+COPY --from=builder /build/templates ./templates
+
 # Change ownership
 RUN chown -R relay:relay /app
 

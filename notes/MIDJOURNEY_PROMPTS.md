@@ -22,31 +22,36 @@
 /imagine a stylized satellite dish icon broadcasting data streams, purple and violet gradients (#667eea, #764ba2), modern minimalist design, circular logo format, tech aesthetic, geometric shapes, white background, vector style, 1024x1024 --v 6 --style raw
 ```
 
+### Option 5: Network Hub + Satellite Dish (Hybrid)
+```
+/imagine a modern network hub icon with satellite dish broadcasting signals to connected nodes, purple gradient (#667eea to #764ba2), isometric perspective with radiating broadcast waves, glowing interconnected nodes, circular frame, tech aesthetic, clean geometric shapes, white background, vector art, professional logo design, 1024x1024 --v 6 --style raw
+```
+
 ## Banner Prompts
 
-### Option 1: Abstract Tech Network
+### Option 1: Central Broadcaster to Multiple Relays
 ```
-/imagine a wide banner image showing abstract network visualization with flowing data streams, purple and blue gradients (#667eea to #764ba2), interconnected nodes, digital waves, modern tech aesthetic, clean and professional, wide format 1500x500, minimalist design --v 6 --style raw
-```
-
-### Option 2: Broadcast Waves
-```
-/imagine a banner showing concentric broadcast waves emanating from center, purple gradient background (#667eea to #764ba2), glowing particles, ethereal atmosphere, modern tech aesthetic, wide format 1500x500, professional and clean --v 6 --style raw
+/imagine a banner showing a central glowing hub broadcasting messages to multiple relay towers on the horizon, purple gradient sky (#667eea to #764ba2), stylized relay servers connected by light beams, modern illustrative style, clear visual narrative of message distribution, professional tech illustration --ar 3:1 --v 6 --style raw
 ```
 
-### Option 3: Data Highway
+### Option 2: Message Amplification Network
 ```
-/imagine an abstract data highway visualization banner, flowing information streams, purple and blue color scheme (#667eea, #2196F3, #764ba2), modern tech design, geometric patterns, particle effects, wide format 1500x500, professional aesthetic --v 6 --style raw
-```
-
-### Option 4: Network Mesh
-```
-/imagine a futuristic network mesh visualization for a banner, interconnected glowing nodes, purple gradient theme (#667eea to #764ba2), flowing data particles, abstract geometric patterns, modern and clean, wide format 1500x500 --v 6 --style raw
+/imagine a banner illustrating a single message being amplified through a network of relay nodes, visual showing one input splitting into many outputs, purple and blue gradient (#667eea to #764ba2), clear data flow arrows, relay towers receiving signals, professional infographic style, modern and clean --ar 3:1 --v 6 --style raw
 ```
 
-### Option 5: Cyberpunk Minimal
+### Option 3: Global Relay Distribution
 ```
-/imagine a minimalist cyberpunk-inspired banner with neon purple accents (#667eea, #764ba2), abstract geometric shapes, digital grid, flowing light trails, modern tech aesthetic, professional and clean, wide format 1500x500 --v 6 --style raw
+/imagine a banner with a stylized world map showing relay distribution, glowing connection lines from central point to multiple global relay locations, purple gradient theme (#667eea to #764ba2), showing broadcast reaching different continents, modern geographic visualization, professional and meaningful --ar 3:1 --v 6 --style raw
+```
+
+### Option 4: Event Broadcasting Pipeline
+```
+/imagine a banner showing the journey of a Nostr event through a broadcast relay system, left to right flow from single source to multiple destinations, relay towers and servers illustrated, purple gradient (#667eea to #764ba2), clear visual storytelling, modern technical illustration, professional design --ar 3:1 --v 6 --style raw
+```
+
+### Option 5: Connected Relay Ecosystem
+```
+/imagine a banner depicting interconnected Nostr relay servers forming an ecosystem, central broadcast relay distributing to surrounding relay nodes, purple gradient background (#667eea to #764ba2), showing collaborative network effect, servers and connection paths clearly visible, modern technical illustration --ar 3:1 --v 6 --style raw
 ```
 
 ## Recommended Specifications

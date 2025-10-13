@@ -143,6 +143,10 @@ func (r *Relay) handleEvent(event *nostr.Event) {
 func (r *Relay) Start() error {
 	mux := http.NewServeMux()
 
+	// Serve static files (icons, banners)
+	fileServer := http.FileServer(http.Dir("."))
+	mux.Handle("/static/", fileServer)
+
 	// Main page handler (HTTP) and WebSocket relay (WS)
 	mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 		// Check if this is a WebSocket upgrade request
@@ -285,4 +289,3 @@ func (r *Relay) serveMainPage(w http.ResponseWriter, req *http.Request) {
 	tmpl := template.Must(template.ParseFiles("templates/main.html"))
 	tmpl.Execute(w, data)
 }
-

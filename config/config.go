@@ -1,6 +1,8 @@
 package config
 
 import (
+	"fmt"
+	"math/rand"
 	"os"
 	"runtime"
 	"strconv"
@@ -54,8 +56,8 @@ func Load() *Config {
 		RelayURL:         getEnv("RELAY_URL", ""),
 		ContactPubkey:    getEnv("CONTACT_PUBKEY", ""),
 		RelayPrivkey:     getEnv("RELAY_PRIVKEY", ""),
-		RelayIcon:        getEnv("RELAY_ICON", ""),
-		RelayBanner:      getEnv("RELAY_BANNER", ""),
+		RelayIcon:        getEnv("RELAY_ICON", "/static/icon1.png"),
+		RelayBanner:      getEnv("RELAY_BANNER", getRandomBanner()),
 	}
 
 	logging.DebugMethod("config", "Load", "Loaded configuration: SeedRelays=%d, MandatoryRelays=%d, TopN=%d, Port=%s, Workers=%d",
@@ -114,4 +116,10 @@ func parseSeedRelays(seedStr string) []string {
 	}
 
 	return result
+}
+
+func getRandomBanner() string {
+	// Randomly select from banner1.png to banner6.png
+	bannerNum := rand.Intn(6) + 1 // 1-6
+	return fmt.Sprintf("/static/banner%d.png", bannerNum)
 }
