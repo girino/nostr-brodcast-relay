@@ -3,28 +3,33 @@ package relay
 import (
 	"context"
 	"fmt"
+	"html/template"
 	"net/http"
 
 	"github.com/fiatjaf/khatru"
 	"github.com/girino/broadcast-relay/broadcaster"
+	"github.com/girino/broadcast-relay/config"
 	"github.com/girino/broadcast-relay/discovery"
 	"github.com/girino/broadcast-relay/logging"
 	"github.com/nbd-wtf/go-nostr"
+	"github.com/nbd-wtf/go-nostr/nip19"
 )
 
 type Relay struct {
 	khatru      *khatru.Relay
 	broadcaster *broadcaster.Broadcaster
 	discovery   *discovery.Discovery
+	config      *config.Config
 	port        string
 }
 
-func NewRelay(port string, bc *broadcaster.Broadcaster, disc *discovery.Discovery) *Relay {
+func NewRelay(cfg *config.Config, bc *broadcaster.Broadcaster, disc *discovery.Discovery) *Relay {
 	r := &Relay{
 		khatru:      khatru.NewRelay(),
 		broadcaster: bc,
 		discovery:   disc,
-		port:        port,
+		config:      cfg,
+		port:        cfg.RelayPort,
 	}
 
 	r.setupRelay()
@@ -34,14 +39,29 @@ func NewRelay(port string, bc *broadcaster.Broadcaster, disc *discovery.Discover
 func (r *Relay) setupRelay() {
 	relay := r.khatru
 
-	// Set relay metadata
-	relay.Info.Name = "Broadcast Relay"
-	relay.Info.Description = "A relay that broadcasts events to multiple relays"
-	relay.Info.PubKey = ""
-	relay.Info.Contact = ""
+	// Derive relay pubkey from privkey if provided
+	relayPubkey := ""
+	if r.config.RelayPrivkey != "" {
+		if _, pubkey, err := nip19.Decode(r.config.RelayPrivkey); err == nil {
+			if sk, ok := pubkey.(string); ok {
+				if pk, err := nostr.GetPublicKey(sk); err == nil {
+					relayPubkey = pk
+				}
+			}
+		}
+	}
+
+	// Set relay metadata from config
+	relay.Info.Name = r.config.RelayName
+	relay.Info.Description = r.config.RelayDescription
+	relay.Info.PubKey = relayPubkey
+	relay.Info.Contact = r.config.ContactPubkey
 	relay.Info.SupportedNIPs = []any{1, 11}
 	relay.Info.Software = "https://github.com/girino/broadcast-relay"
-	relay.Info.Version = "1.0.0"
+	relay.Info.Version = "0.2.0-rc1"
+	relay.Info.Icon = r.config.RelayIcon
+
+	// Note: Banner is shown on main page but not in NIP-11 (not a standard field)
 
 	// Reject cached events (duplicates)
 	relay.RejectEvent = append(relay.RejectEvent,
@@ -123,8 +143,18 @@ func (r *Relay) handleEvent(event *nostr.Event) {
 func (r *Relay) Start() error {
 	mux := http.NewServeMux()
 
-	// Mount the relay
-	mux.Handle("/", r.khatru)
+	// Main page handler (HTTP) and WebSocket relay (WS)
+	mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+		// Check if this is a WebSocket upgrade request
+		if req.Header.Get("Upgrade") == "websocket" {
+			// Let khatru handle WebSocket connections
+			r.khatru.ServeHTTP(w, req)
+			return
+		}
+
+		// Serve HTML main page for HTTP requests
+		r.serveMainPage(w, req)
+	})
 
 	// Add a stats endpoint
 	mux.HandleFunc("/stats", func(w http.ResponseWriter, req *http.Request) {
@@ -207,6 +237,52 @@ func (r *Relay) Start() error {
 	logging.Info("Relay: Starting relay server on %s", addr)
 	logging.Debug("Relay: WebSocket endpoint ready")
 	logging.Debug("Relay: Stats endpoint ready")
+	logging.Debug("Relay: Main page endpoint ready")
 
 	return http.ListenAndServe(addr, mux)
 }
+
+// serveMainPage serves the HTML main page with relay information
+func (r *Relay) serveMainPage(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+
+	// Get relay pubkey for display
+	relayPubkey := r.khatru.Info.PubKey
+	relayNpub := ""
+	if relayPubkey != "" {
+		if npub, err := nip19.EncodePublicKey(relayPubkey); err == nil {
+			relayNpub = npub
+		}
+	}
+
+	// Get contact npub for display
+	contactNpub := ""
+	if r.config.ContactPubkey != "" {
+		contactNpub = r.config.ContactPubkey
+		// If it's a hex pubkey, convert to npub
+		if len(r.config.ContactPubkey) == 64 {
+			if npub, err := nip19.EncodePublicKey(r.config.ContactPubkey); err == nil {
+				contactNpub = npub
+			}
+		}
+	}
+
+	// Prepare template data
+	data := map[string]interface{}{
+		"Name":        r.config.RelayName,
+		"Description": r.config.RelayDescription,
+		"URL":         r.config.RelayURL,
+		"RelayPubkey": relayPubkey,
+		"RelayNpub":   relayNpub,
+		"ContactNpub": contactNpub,
+		"Icon":        r.config.RelayIcon,
+		"Banner":      r.config.RelayBanner,
+		"Version":     r.khatru.Info.Version,
+		"Software":    r.khatru.Info.Software,
+	}
+
+	tmpl := template.Must(template.ParseFiles("templates/main.html"))
+	tmpl.Execute(w, data)
+}
+

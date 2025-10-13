@@ -104,7 +104,7 @@ func main() {
 	// Start the relay server
 	logging.Info("")
 	logging.Info("========== PHASE 3: STARTING RELAY SERVER ==========")
-	relayServer := relay.NewRelay(cfg.RelayPort, bc, disc)
+	relayServer := relay.NewRelay(cfg, bc, disc)
 
 	// Handle graceful shutdown
 	sigChan := make(chan os.Signal, 1)

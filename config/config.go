@@ -21,6 +21,14 @@ type Config struct {
 	SuccessRateDecay    float64
 	WorkerCount         int
 	CacheTTL            time.Duration
+	// Relay metadata
+	RelayName        string
+	RelayDescription string
+	RelayURL         string
+	ContactPubkey    string
+	RelayPrivkey     string
+	RelayIcon        string
+	RelayBanner      string
 }
 
 func Load() *Config {
@@ -40,6 +48,14 @@ func Load() *Config {
 		SuccessRateDecay:    getEnvFloat("SUCCESS_RATE_DECAY", 0.95),
 		WorkerCount:         workerCount,
 		CacheTTL:            getEnvDuration("CACHE_TTL", 5*time.Minute),
+		// Relay metadata
+		RelayName:        getEnv("RELAY_NAME", "Broadcast Relay"),
+		RelayDescription: getEnv("RELAY_DESCRIPTION", "A Nostr relay that broadcasts events to multiple relays"),
+		RelayURL:         getEnv("RELAY_URL", ""),
+		ContactPubkey:    getEnv("CONTACT_PUBKEY", ""),
+		RelayPrivkey:     getEnv("RELAY_PRIVKEY", ""),
+		RelayIcon:        getEnv("RELAY_ICON", ""),
+		RelayBanner:      getEnv("RELAY_BANNER", ""),
 	}
 
 	logging.DebugMethod("config", "Load", "Loaded configuration: SeedRelays=%d, MandatoryRelays=%d, TopN=%d, Port=%s, Workers=%d",

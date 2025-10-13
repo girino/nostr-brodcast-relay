@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Name}}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        {{if .Banner}}
+        .banner {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            display: block;
+        }
+        {{end}}
+        .header {
+            padding: 30px;
+            text-align: center;
+            background: #f8f9fa;
+        }
+        {{if .Icon}}
+        .icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            display: block;
+            border: 4px solid #667eea;
+        }
+        {{end}}
+        h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+            color: #667eea;
+        }
+        .description {
+            color: #666;
+            font-size: 1.1em;
+            line-height: 1.6;
+        }
+        .info-section {
+            padding: 30px;
+        }
+        .info-item {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        .info-label {
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+            text-transform: uppercase;
+        }
+        .info-value {
+            color: #333;
+            word-break: break-all;
+            font-family: 'Courier New', monospace;
+            font-size: 0.95em;
+        }
+        .info-value a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        .info-value a:hover {
+            text-decoration: underline;
+        }
+        .connection-info {
+            background: #e7f3ff;
+            border-left-color: #2196F3;
+        }
+        .footer {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            text-align: center;
+            color: #666;
+            font-size: 0.9em;
+            border-top: 1px solid #dee2e6;
+        }
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        .ws-url {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #2196F3;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            background: #667eea;
+            color: white;
+            border-radius: 20px;
+            font-size: 0.85em;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        {{if .Banner}}
+        <img src="{{.Banner}}" alt="{{.Name}} Banner" class="banner">
+        {{end}}
+        
+        <div class="header">
+            {{if .Icon}}
+            <img src="{{.Icon}}" alt="{{.Name}} Icon" class="icon">
+            {{end}}
+            <h1>{{.Name}}</h1>
+            <p class="description">{{.Description}}</p>
+            <div style="margin-top: 15px;">
+                <span class="badge">NIP-01</span>
+                <span class="badge">NIP-11</span>
+            </div>
+        </div>
+        
+        <div class="info-section">
+            {{if .URL}}
+            <div class="info-item connection-info">
+                <div class="info-label">🌐 Relay Address</div>
+                <div class="info-value ws-url">{{.URL}}</div>
+            </div>
+            {{end}}
+            
+            {{if .RelayNpub}}
+            <div class="info-item">
+                <div class="info-label">🔑 Relay Public Key</div>
+                <div class="info-value">
+                    <a href="https://njump.me/{{.RelayNpub}}" target="_blank">{{.RelayNpub}}</a>
+                </div>
+            </div>
+            {{end}}
+            
+            {{if .ContactNpub}}
+            <div class="info-item">
+                <div class="info-label">📧 Contact</div>
+                <div class="info-value">
+                    <a href="https://njump.me/{{.ContactNpub}}" target="_blank">{{.ContactNpub}}</a>
+                </div>
+            </div>
+            {{end}}
+            
+            <div class="info-item">
+                <div class="info-label">ℹ️ About This Relay</div>
+                <div class="info-value" style="font-family: inherit;">
+                    This is a <strong>broadcast relay</strong> that accepts your events and broadcasts them to multiple high-quality Nostr relays.
+                    Your events are not stored permanently - they are only cached temporarily to prevent duplicates.
+                </div>
+            </div>
+            
+            <div class="info-item">
+                <div class="info-label">⚡ How It Works</div>
+                <div class="info-value" style="font-family: inherit;">
+                    1. Publish your event to this relay<br>
+                    2. Event is queued and broadcast to top-ranked relays<br>
+                    3. Events are cached for 5 minutes to prevent duplicates<br>
+                    4. Health monitoring ensures only reliable relays are used
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <div>Powered by <a href="{{.Software}}" target="_blank">Broadcast Relay</a> {{.Version}}</div>
+            <div style="margin-top: 10px;">
+                <a href="/stats">📊 View Stats</a> | 
+                <a href="https://github.com/nostr-protocol/nips" target="_blank">📖 Nostr NIPs</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+
