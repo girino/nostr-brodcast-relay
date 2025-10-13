@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Verify dependencies
+        run: go mod verify
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Run go fmt check
+        run: |
+          if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+            echo "The following files are not formatted:"
+            gofmt -s -l .
+            exit 1
+          fi
+
+      - name: Build
+        run: go build -v -o broadcast-relay .
+
+      - name: Run tests
+        run: go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.txt
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+      - name: Build for multiple platforms
+        run: |
+          GOOS=linux GOARCH=amd64 go build -o broadcast-relay-linux-amd64
+          GOOS=linux GOARCH=arm64 go build -o broadcast-relay-linux-arm64
+          GOOS=darwin GOARCH=amd64 go build -o broadcast-relay-darwin-amd64
+          GOOS=darwin GOARCH=arm64 go build -o broadcast-relay-darwin-arm64
+          GOOS=windows GOARCH=amd64 go build -o broadcast-relay-windows-amd64.exe
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries
+          path: |
+            broadcast-relay-*
+          retention-days: 7
+

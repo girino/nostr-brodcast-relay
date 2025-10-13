@@ -7,6 +7,8 @@
 [![License: GAL](https://img.shields.io/badge/license-GAL-purple)](https://license.girino.org)
 [![Go Version](https://img.shields.io/badge/go-1.23%2B-blue)](https://go.dev/)
 [![Docker](https://img.shields.io/badge/docker-ready-blue)](https://www.docker.com/)
+[![CI](https://github.com/girino/nostr-brodcast-relay/workflows/CI/badge.svg)](https://github.com/girino/nostr-brodcast-relay/actions)
+[![Release](https://github.com/girino/nostr-brodcast-relay/workflows/Release%20Binaries/badge.svg)](https://github.com/girino/nostr-brodcast-relay/releases)
 
 [Features](#features) • [Quick Start](#quick-start) • [Documentation](#documentation) • [Contributing](#contributing)
 

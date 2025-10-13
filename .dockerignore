@@ -57,10 +57,11 @@ temp/
 *.tmp
 *.log
 
-# CI/CD
+# CI/CD  
 .github/
 .gitlab-ci.yml
 .travis.yml
+.gitattributes
 
 # Scripts (if you don't need them in container)
 scripts/
