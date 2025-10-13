@@ -71,14 +71,22 @@ func (r *Relay) setupRelay() {
 		logging.DebugMethod("relay", "setupRelay", "Using default relay URL: %s", relayURL)
 	}
 
+	// Set default contact to relay pubkey if not configured
+	contactPubkey := r.config.ContactPubkey
+	if contactPubkey == "" {
+		contactPubkey = relayPubkey
+		logging.DebugMethod("relay", "setupRelay", "Using relay pubkey as contact (not configured separately)")
+	}
+
 	// Update config with defaults for template rendering
 	r.config.RelayURL = relayURL
+	r.config.ContactPubkey = contactPubkey
 
 	// Set relay metadata from config
 	relay.Info.Name = r.config.RelayName
 	relay.Info.Description = r.config.RelayDescription
 	relay.Info.PubKey = relayPubkey
-	relay.Info.Contact = r.config.ContactPubkey
+	relay.Info.Contact = contactPubkey
 	relay.Info.SupportedNIPs = []any{1, 11}
 	relay.Info.Software = "https://github.com/girino/broadcast-relay"
 	relay.Info.Version = "0.2.0-rc1"
