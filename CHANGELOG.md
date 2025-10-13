@@ -7,12 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2025-10-13
+
+**First stable release of Broadcast Relay!** 🎉
+
+A production-ready Nostr relay that broadcasts events to multiple relays with intelligent health monitoring and automatic relay discovery.
+
+### Features
+- **Worker Pool Architecture**: Configurable concurrent event broadcasting
+- **Event Deduplication**: Time-based cache with configurable TTL (default 5 minutes)
+- **Hybrid Queue System**: Bounded channel with unbounded overflow for reliability
+- **Relay Discovery**: Automatic relay discovery from NIP-11 compatible relays
+- **Health Monitoring**: Continuous relay health checks and performance tracking
+- **Mandatory Relays**: Always-broadcast relay support with separate statistics
+- **Granular Logging**: Module and method-specific verbose logging
+- **Beautiful Web UI**: Landing page with relay information and branding
+- **Multi-platform**: Linux, macOS, Windows on AMD64 and ARM64
+- **Docker Support**: Production-ready Docker Compose with Tor hidden service
+- **Automated Builds**: GitHub Actions for binary and Docker image releases
+
+### Configuration
+- 20+ environment variables for complete customization
+- Sensible defaults (works out of the box)
+- Auto-generated relay keypair if not configured
+- Random banner selection from static assets
+
+### Documentation
+- Comprehensive README with examples and FAQ
+- Complete configuration reference (CONFIG.md)
+- Docker deployment guide with Tor (DOCKER.md)
+- Contributor guidelines (CONTRIBUTING.md)
+- Verbose logging guide (VERBOSE_LOGGING.md)
+
+### Repository
+- Primary: `nostr://npub18lav8fkgt8424rxamvk8qq4xuy9n8mltjtgztv2w44hc5tt9vets0hcfsz/relay.ngit.dev/broadcast-relay`
+- Web: https://gitworkshop.dev/girino@girino.org/broadcast-relay
+- License: Girino's Anarchist License (GAL)
+
 ## [1.0.0-rc2] - 2025-10-13
 
 Second release candidate for v1.0.0 stable release.
 
 ### Fixed
 - CI workflow test command simplified (removed covdata tool dependency)
+- Docker workflow build attestation removed (permission issues)
+- Dockerfile multi-arch support (removed hardcoded GOOS/GOARCH)
 - GitHub Actions workflows now pass successfully
 
 ### Changed

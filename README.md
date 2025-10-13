@@ -679,7 +679,9 @@ Granular control over debug output:
 
 ## Project Status
 
-### Current Version: 1.0.0-rc2
+### Current Version: 1.0.0 🎉
+
+**First stable release! Production ready.**
 
 **Recent Features:**
 - ✅ Worker pool architecture
