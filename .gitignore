@@ -17,6 +17,7 @@ go.work
 # Build output
 broadcast-relay
 /broadcast-relay
+release/
 
 # IDE
 .vscode/
