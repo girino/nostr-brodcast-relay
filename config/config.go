@@ -1,8 +1,6 @@
 package config
 
 import (
-	"fmt"
-	"math/rand"
 	"os"
 	"runtime"
 	"strconv"
@@ -30,7 +28,7 @@ type Config struct {
 	ContactPubkey    string
 	RelayPrivkey     string
 	RelayIcon        string
-	RelayBanner      string
+	RelayBanners     []string
 }
 
 func Load() *Config {
@@ -57,7 +55,7 @@ func Load() *Config {
 		ContactPubkey:    getEnv("CONTACT_PUBKEY", ""),
 		RelayPrivkey:     getEnv("RELAY_PRIVKEY", ""),
 		RelayIcon:        getEnv("RELAY_ICON", "/static/icon1.png"),
-		RelayBanner:      getEnv("RELAY_BANNER", getRandomBanner()),
+		RelayBanners:     parseBannerList(getEnv("RELAY_BANNERS", "")),
 	}
 
 	logging.DebugMethod("config", "Load", "Loaded configuration: SeedRelays=%d, MandatoryRelays=%d, TopN=%d, Port=%s, Workers=%d",
@@ -118,8 +116,29 @@ func parseSeedRelays(seedStr string) []string {
 	return result
 }
 
-func getRandomBanner() string {
-	// Randomly select from banner1.png to banner6.png
-	bannerNum := rand.Intn(6) + 1 // 1-6
-	return fmt.Sprintf("/static/banner%d.png", bannerNum)
+func parseBannerList(bannerStr string) []string {
+	if bannerStr == "" {
+		// Default to local static banners
+		return []string{
+			"/static/banner1.png",
+			"/static/banner2.png",
+			"/static/banner3.png",
+			"/static/banner4.png",
+			"/static/banner5.png",
+			"/static/banner6.png",
+		}
+	}
+
+	// Parse comma-separated list (same as parseSeedRelays)
+	banners := strings.Split(bannerStr, ",")
+	result := make([]string, 0, len(banners))
+
+	for _, banner := range banners {
+		banner = strings.TrimSpace(banner)
+		if banner != "" {
+			result = append(result, banner)
+		}
+	}
+
+	return result
 }

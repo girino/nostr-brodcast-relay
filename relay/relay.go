@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"html/template"
+	"math/rand"
 	"net/http"
 
 	"github.com/fiatjaf/khatru"
@@ -272,6 +273,12 @@ func (r *Relay) serveMainPage(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
+	// Select random banner from list
+	randomBanner := ""
+	if len(r.config.RelayBanners) > 0 {
+		randomBanner = r.config.RelayBanners[rand.Intn(len(r.config.RelayBanners))]
+	}
+
 	// Prepare template data
 	data := map[string]interface{}{
 		"Name":        r.config.RelayName,
@@ -281,7 +288,7 @@ func (r *Relay) serveMainPage(w http.ResponseWriter, req *http.Request) {
 		"RelayNpub":   relayNpub,
 		"ContactNpub": contactNpub,
 		"Icon":        r.config.RelayIcon,
-		"Banner":      r.config.RelayBanner,
+		"Banner":      randomBanner,
 		"Version":     r.khatru.Info.Version,
 		"Software":    r.khatru.Info.Software,
 	}
