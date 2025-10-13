@@ -187,7 +187,15 @@ func (r *Relay) Start() error {
 			return
 		}
 
-		// Serve HTML main page for HTTP requests
+		// Check if this is a NIP-11 request (Accept: application/nostr+json)
+		accept := req.Header.Get("Accept")
+		if accept == "application/nostr+json" {
+			// Let khatru handle NIP-11 relay information document
+			r.khatru.ServeHTTP(w, req)
+			return
+		}
+
+		// Serve HTML main page for regular HTTP requests
 		r.serveMainPage(w, req)
 	})
 
