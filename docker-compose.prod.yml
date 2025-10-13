@@ -55,17 +55,20 @@ services:
       # Syntax: {SERVICE}_TOR_SERVICE_HOSTS=port:target:targetport
       - RELAY_TOR_SERVICE_HOSTS=80:relay:3334
       - RELAY_TOR_SERVICE_VERSION=3
+      # Enable SOCKS proxy for health check
+      - TOR_SOCKS_PORT=9050
     volumes:
       # Persist Tor hidden service keys
       - tor-data:/var/lib/tor/hidden_service/
     networks:
       - relay-network
     healthcheck:
-      test: ["CMD", "sh", "-c", "test -f /var/lib/tor/hidden_service/relay/hostname && pgrep tor"]
-      interval: 30s
-      timeout: 10s
+      # Test Tor connectivity by checking Tor API through SOCKS proxy
+      test: ["CMD", "sh", "-c", "test -f /var/lib/tor/hidden_service/relay/hostname && curl --socks5-hostname localhost:9050 --max-time 10 --silent --fail https://check.torproject.org/api/ip | grep -q '\"IsTor\":true'"]
+      interval: 60s
+      timeout: 15s
       retries: 3
-      start_period: 60s
+      start_period: 90s
     logging:
       driver: "json-file"
       options:

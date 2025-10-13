@@ -73,7 +73,11 @@ The main broadcast relay service. Exposed only to the internal Docker network by
 
 Provides a .onion address for anonymous access.
 
-**Health Check**: Verifies Tor process is running and hostname file exists
+**Health Check**: 
+- Verifies hostname file exists (hidden service created)
+- Tests actual Tor connectivity through SOCKS proxy
+- Queries Tor Project API to confirm traffic is routed through Tor
+- More reliable than just checking if process is running
 
 **Get your .onion address**:
 ```bash
@@ -205,7 +209,10 @@ The relay runs as a non-root user (`relay:relay`, UID/GID 1000) inside the conta
 All Docker services have health checks configured:
 
 - **Relay**: Checks `/stats` endpoint every 30s
-- **Tor**: Verifies Tor process and hostname file every 30s  
+- **Tor**: Tests actual Tor connectivity every 60s
+  - Verifies hidden service hostname file exists
+  - Queries Tor Project API through SOCKS proxy
+  - Confirms traffic is routed through Tor network
 - **Autoheal**: Monitors all containers and auto-restarts unhealthy ones
 
 **Note**: Nginx runs on the host and is monitored by systemd
@@ -326,7 +333,7 @@ docker-compose -f docker-compose.prod.yml logs tor
 docker-compose -f docker-compose.prod.yml restart tor
 
 # Wait 30 seconds, then check
-docker exec broadcast-relay-tor cat /var/lib/tor/hidden_service/hostname
+docker exec broadcast-relay-tor cat /var/lib/tor/hidden_service/relay/hostname
 ```
 
 ### Connection issues
