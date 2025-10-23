@@ -1,4 +1,4 @@
-module github.com/girino/broadcast-relay
+module github.com/girino/nostr-brodcast-relay
 
 go 1.25.2
 
