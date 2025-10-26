@@ -205,7 +205,7 @@ func (r *Relay) Start() error {
 	// Add a stats endpoint
 	mux.HandleFunc("/stats", func(w http.ResponseWriter, req *http.Request) {
 		// Use the global stats collector
-		allStats := stats.Global().GetAllStats()
+		allStats := stats.GetCollector().GetAllStats()
 
 		// Add timestamp
 		allStats.Set("timestamp", json.NewJsonValue(time.Now().Unix()))
