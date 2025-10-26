@@ -13,6 +13,7 @@ import (
 	"github.com/girino/broadcast-relay/config"
 	"github.com/girino/nostr-lib/broadcast"
 	"github.com/girino/nostr-lib/broadcast/health"
+	jsonlib "github.com/girino/nostr-lib/json"
 	"github.com/girino/nostr-lib/logging"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip19"
@@ -208,7 +209,7 @@ func (r *Relay) Start() error {
 		allStats := statsCollector.GetAllStats()
 
 		// Add timestamp
-		allStats["timestamp"] = time.Now().Unix()
+		allStats.Set("timestamp", jsonlib.NewJsonValue(time.Now().Unix()))
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -228,10 +229,47 @@ func (r *Relay) Start() error {
 	mux.HandleFunc("/health", func(w http.ResponseWriter, req *http.Request) {
 		// Get basic health information
 		stats := r.broadcastSystem.GetStats()
+		statsObj, ok := stats.(*jsonlib.JsonObject)
+		if !ok {
+			logging.Error("Failed to get stats as JsonObject")
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
 
-		// Extract health information from structured stats
-		totalRelays := stats.Manager.TotalRelays
-		activeRelays := len(stats.Manager.TopRelays)
+		// Extract health information from stats
+		managerObj, exists := statsObj.Get("manager")
+		if !exists {
+			logging.Error("Manager stats not found")
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+
+		managerStats, ok := managerObj.(*jsonlib.JsonObject)
+		if !ok {
+			logging.Error("Manager stats is not a JsonObject")
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+
+		// Get total relays
+		totalRelaysVal, hasTotal := managerStats.Get("total_relays")
+		var totalRelays int
+		if hasTotal {
+			if totalRelaysEntity, ok := totalRelaysVal.(*jsonlib.JsonValue); ok {
+				if val, ok := totalRelaysEntity.GetInt(); ok {
+					totalRelays = int(val)
+				}
+			}
+		}
+
+		// Get active relays count from top_relays list
+		topRelaysVal, hasTop := managerStats.Get("top_relays")
+		activeRelays := 0
+		if hasTop {
+			if topRelaysList, ok := topRelaysVal.(*jsonlib.JsonList); ok {
+				activeRelays = topRelaysList.Length()
+			}
+		}
 
 		// Determine health status
 		status := "healthy"
@@ -241,11 +279,17 @@ func (r *Relay) Start() error {
 			status = "degraded"
 		}
 
-		healthResponse := map[string]interface{}{
-			"status":        status,
-			"total_relays":  totalRelays,
-			"active_relays": activeRelays,
-			"timestamp":     stats.Timestamp,
+		healthResponse := jsonlib.NewJsonObject()
+		healthResponse.Set("status", jsonlib.NewJsonValue(status))
+		healthResponse.Set("total_relays", jsonlib.NewJsonValue(totalRelays))
+		healthResponse.Set("active_relays", jsonlib.NewJsonValue(activeRelays))
+		
+		// Get timestamp
+		timestampVal, hasTimestamp := statsObj.Get("timestamp")
+		if hasTimestamp {
+			if timestampEntity, ok := timestampVal.(*jsonlib.JsonValue); ok {
+				healthResponse.Set("timestamp", timestampEntity)
+			}
 		}
 
 		w.Header().Set("Content-Type", "application/json")
