@@ -229,9 +229,6 @@ func (r *Relay) Start() error {
 		// Get basic health information from global stats
 		statsObj := stats.GetCollector().GetAllStats()
 
-		// Add current timestamp
-		statsObj.Set("timestamp", json.NewJsonValue(time.Now().Unix()))
-
 		// Extract health information from stats
 		managerObj, exists := statsObj.Get("manager")
 		if !exists {
@@ -279,13 +276,7 @@ func (r *Relay) Start() error {
 		healthResponse.Set("status", json.NewJsonValue(status))
 		healthResponse.Set("total_relays", json.NewJsonValue(totalRelays))
 		healthResponse.Set("active_relays", json.NewJsonValue(activeRelays))
-
-		// Get timestamp from stats
-		if timestampVal, hasTimestamp := statsObj.Get("timestamp"); hasTimestamp {
-			if timestampEntity, ok := timestampVal.(*json.JsonValue); ok {
-				healthResponse.Set("timestamp", timestampEntity)
-			}
-		}
+		healthResponse.Set("timestamp", json.NewJsonValue(time.Now().Unix()))
 
 		w.Header().Set("Content-Type", "application/json")
 
