@@ -14,6 +14,7 @@ import (
 	"github.com/girino/nostr-lib/broadcast/health"
 	json "github.com/girino/nostr-lib/json"
 	"github.com/girino/nostr-lib/logging"
+	"github.com/girino/nostr-lib/stats"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip19"
 )
@@ -203,9 +204,8 @@ func (r *Relay) Start() error {
 
 	// Add a stats endpoint
 	mux.HandleFunc("/stats", func(w http.ResponseWriter, req *http.Request) {
-		// Use the generic stats collector
-		statsCollector := r.broadcastSystem.GetStatsCollector()
-		allStats := statsCollector.GetAllStats()
+		// Use the global stats collector
+		allStats := stats.Global().GetAllStats()
 
 		// Add timestamp
 		allStats.Set("timestamp", json.NewJsonValue(time.Now().Unix()))
