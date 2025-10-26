@@ -226,14 +226,11 @@ func (r *Relay) Start() error {
 
 	// Add a health endpoint
 	mux.HandleFunc("/health", func(w http.ResponseWriter, req *http.Request) {
-		// Get basic health information
-		stats := r.broadcastSystem.GetStats()
-		statsObj, ok := stats.(*json.JsonObject)
-		if !ok {
-			logging.Error("Failed to get stats as JsonObject")
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return
-		}
+		// Get basic health information from global stats
+		statsObj := stats.GetCollector().GetAllStats()
+
+		// Add current timestamp
+		statsObj.Set("timestamp", json.NewJsonValue(time.Now().Unix()))
 
 		// Extract health information from stats
 		managerObj, exists := statsObj.Get("manager")
@@ -283,9 +280,8 @@ func (r *Relay) Start() error {
 		healthResponse.Set("total_relays", json.NewJsonValue(totalRelays))
 		healthResponse.Set("active_relays", json.NewJsonValue(activeRelays))
 
-		// Get timestamp
-		timestampVal, hasTimestamp := statsObj.Get("timestamp")
-		if hasTimestamp {
+		// Get timestamp from stats
+		if timestampVal, hasTimestamp := statsObj.Get("timestamp"); hasTimestamp {
 			if timestampEntity, ok := timestampVal.(*json.JsonValue); ok {
 				healthResponse.Set("timestamp", timestampEntity)
 			}
