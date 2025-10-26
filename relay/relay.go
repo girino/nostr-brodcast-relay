@@ -2,7 +2,6 @@ package relay
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"html/template"
 	"math/rand"
@@ -215,7 +214,7 @@ func (r *Relay) Start() error {
 		w.WriteHeader(http.StatusOK)
 
 		// Marshal to JSON
-		jsonData, err := json.MarshalIndent(allStats, "", "  ")
+		jsonData, err := jsonlib.MarshalIndent(allStats, "", "  ")
 		if err != nil {
 			logging.Error("Failed to marshal stats to JSON: %v", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -283,7 +282,7 @@ func (r *Relay) Start() error {
 		healthResponse.Set("status", jsonlib.NewJsonValue(status))
 		healthResponse.Set("total_relays", jsonlib.NewJsonValue(totalRelays))
 		healthResponse.Set("active_relays", jsonlib.NewJsonValue(activeRelays))
-		
+
 		// Get timestamp
 		timestampVal, hasTimestamp := statsObj.Get("timestamp")
 		if hasTimestamp {
@@ -305,7 +304,7 @@ func (r *Relay) Start() error {
 		}
 
 		// Marshal to JSON
-		jsonData, err := json.MarshalIndent(healthResponse, "", "  ")
+		jsonData, err := jsonlib.MarshalIndent(healthResponse, "", "  ")
 		if err != nil {
 			logging.Error("Failed to marshal health to JSON: %v", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)

@@ -10,8 +10,8 @@ import (
 
 	"github.com/girino/broadcast-relay/config"
 	"github.com/girino/broadcast-relay/relay"
-	jsonlib "github.com/girino/nostr-lib/json"
 	"github.com/girino/nostr-lib/broadcast"
+	jsonlib "github.com/girino/nostr-lib/json"
 	"github.com/girino/nostr-lib/logging"
 )
 
@@ -153,7 +153,7 @@ func main() {
 	// Print final stats
 	finalStats := broadcastSystem.GetStats()
 	logging.Info("Final stats:")
-	
+
 	// Extract manager stats
 	if statsObj, ok := finalStats.(*jsonlib.JsonObject); ok {
 		managerObj, hasManager := statsObj.Get("manager")
@@ -167,7 +167,7 @@ func main() {
 						}
 					}
 				}
-				
+
 				topRelaysVal, hasTop := managerStats.Get("top_relays")
 				if hasTop {
 					if topRelaysList, ok := topRelaysVal.(*jsonlib.JsonList); ok {
