@@ -2,11 +2,8 @@ module github.com/girino/broadcast-relay
 
 go 1.25.3
 
-replace github.com/girino/nostr-lib => ../nostr-lib
-
 require (
 	github.com/fiatjaf/khatru v0.19.1
-	github.com/girino/nostr-lib v0.0.0-00010101000000-000000000000
 	github.com/nbd-wtf/go-nostr v0.52.0
 )
 
