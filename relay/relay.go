@@ -12,7 +12,7 @@ import (
 	"github.com/girino/broadcast-relay/config"
 	"github.com/girino/nostr-lib/broadcast"
 	"github.com/girino/nostr-lib/broadcast/health"
-	jsonlib "github.com/girino/nostr-lib/json"
+	json "github.com/girino/nostr-lib/json"
 	"github.com/girino/nostr-lib/logging"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip19"
@@ -208,13 +208,13 @@ func (r *Relay) Start() error {
 		allStats := statsCollector.GetAllStats()
 
 		// Add timestamp
-		allStats.Set("timestamp", jsonlib.NewJsonValue(time.Now().Unix()))
+		allStats.Set("timestamp", json.NewJsonValue(time.Now().Unix()))
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 
 		// Marshal to JSON
-		jsonData, err := jsonlib.MarshalIndent(allStats, "", "  ")
+		jsonData, err := json.MarshalIndent(allStats, "", "  ")
 		if err != nil {
 			logging.Error("Failed to marshal stats to JSON: %v", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -228,7 +228,7 @@ func (r *Relay) Start() error {
 	mux.HandleFunc("/health", func(w http.ResponseWriter, req *http.Request) {
 		// Get basic health information
 		stats := r.broadcastSystem.GetStats()
-		statsObj, ok := stats.(*jsonlib.JsonObject)
+		statsObj, ok := stats.(*json.JsonObject)
 		if !ok {
 			logging.Error("Failed to get stats as JsonObject")
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -243,7 +243,7 @@ func (r *Relay) Start() error {
 			return
 		}
 
-		managerStats, ok := managerObj.(*jsonlib.JsonObject)
+		managerStats, ok := managerObj.(*json.JsonObject)
 		if !ok {
 			logging.Error("Manager stats is not a JsonObject")
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -254,7 +254,7 @@ func (r *Relay) Start() error {
 		totalRelaysVal, hasTotal := managerStats.Get("total_relays")
 		var totalRelays int
 		if hasTotal {
-			if totalRelaysEntity, ok := totalRelaysVal.(*jsonlib.JsonValue); ok {
+			if totalRelaysEntity, ok := totalRelaysVal.(*json.JsonValue); ok {
 				if val, ok := totalRelaysEntity.GetInt(); ok {
 					totalRelays = int(val)
 				}
@@ -265,7 +265,7 @@ func (r *Relay) Start() error {
 		topRelaysVal, hasTop := managerStats.Get("top_relays")
 		activeRelays := 0
 		if hasTop {
-			if topRelaysList, ok := topRelaysVal.(*jsonlib.JsonList); ok {
+			if topRelaysList, ok := topRelaysVal.(*json.JsonList); ok {
 				activeRelays = topRelaysList.Length()
 			}
 		}
@@ -278,15 +278,15 @@ func (r *Relay) Start() error {
 			status = "degraded"
 		}
 
-		healthResponse := jsonlib.NewJsonObject()
-		healthResponse.Set("status", jsonlib.NewJsonValue(status))
-		healthResponse.Set("total_relays", jsonlib.NewJsonValue(totalRelays))
-		healthResponse.Set("active_relays", jsonlib.NewJsonValue(activeRelays))
+		healthResponse := json.NewJsonObject()
+		healthResponse.Set("status", json.NewJsonValue(status))
+		healthResponse.Set("total_relays", json.NewJsonValue(totalRelays))
+		healthResponse.Set("active_relays", json.NewJsonValue(activeRelays))
 
 		// Get timestamp
 		timestampVal, hasTimestamp := statsObj.Get("timestamp")
 		if hasTimestamp {
-			if timestampEntity, ok := timestampVal.(*jsonlib.JsonValue); ok {
+			if timestampEntity, ok := timestampVal.(*json.JsonValue); ok {
 				healthResponse.Set("timestamp", timestampEntity)
 			}
 		}
@@ -304,7 +304,7 @@ func (r *Relay) Start() error {
 		}
 
 		// Marshal to JSON
-		jsonData, err := jsonlib.MarshalIndent(healthResponse, "", "  ")
+		jsonData, err := json.MarshalIndent(healthResponse, "", "  ")
 		if err != nil {
 			logging.Error("Failed to marshal health to JSON: %v", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)

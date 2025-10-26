@@ -11,7 +11,7 @@ import (
 	"github.com/girino/broadcast-relay/config"
 	"github.com/girino/broadcast-relay/relay"
 	"github.com/girino/nostr-lib/broadcast"
-	jsonlib "github.com/girino/nostr-lib/json"
+	json "github.com/girino/nostr-lib/json"
 	"github.com/girino/nostr-lib/logging"
 )
 
@@ -155,13 +155,13 @@ func main() {
 	logging.Info("Final stats:")
 
 	// Extract manager stats
-	if statsObj, ok := finalStats.(*jsonlib.JsonObject); ok {
+	if statsObj, ok := finalStats.(*json.JsonObject); ok {
 		managerObj, hasManager := statsObj.Get("manager")
 		if hasManager {
-			if managerStats, ok := managerObj.(*jsonlib.JsonObject); ok {
+			if managerStats, ok := managerObj.(*json.JsonObject); ok {
 				totalRelaysVal, hasTotal := managerStats.Get("total_relays")
 				if hasTotal {
-					if totalRelaysEntity, ok := totalRelaysVal.(*jsonlib.JsonValue); ok {
+					if totalRelaysEntity, ok := totalRelaysVal.(*json.JsonValue); ok {
 						if totalRelays, ok := totalRelaysEntity.GetInt(); ok {
 							logging.Info("  - Total relays: %d", totalRelays)
 						}
@@ -170,7 +170,7 @@ func main() {
 
 				topRelaysVal, hasTop := managerStats.Get("top_relays")
 				if hasTop {
-					if topRelaysList, ok := topRelaysVal.(*jsonlib.JsonList); ok {
+					if topRelaysList, ok := topRelaysVal.(*json.JsonList); ok {
 						logging.Info("  - Active relays: %d", topRelaysList.Length())
 					}
 				}
