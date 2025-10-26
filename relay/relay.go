@@ -255,6 +255,17 @@ func (r *Relay) Start() error {
 			}
 		}
 
+		// Get top_n (max relays expected)
+		topNVal, hasTopN := managerStats.Get("top_n")
+		var maxRelays int
+		if hasTopN {
+			if topNEntity, ok := topNVal.(*json.JsonValue); ok {
+				if val, ok := topNEntity.GetInt(); ok {
+					maxRelays = int(val)
+				}
+			}
+		}
+
 		// Get active relays count from top_relays list
 		topRelaysVal, hasTop := managerStats.Get("top_relays")
 		activeRelays := 0
@@ -264,31 +275,47 @@ func (r *Relay) Start() error {
 			}
 		}
 
-		// Determine health status
-		status := "healthy"
-		if totalRelays == 0 {
+		// Determine health status and color
+		var status string
+		var color string
+		var statusCode int
+
+		if totalRelays == 0 || activeRelays == 0 {
 			status = "unhealthy"
-		} else if activeRelays == 0 {
-			status = "degraded"
+			color = "red"
+			statusCode = http.StatusServiceUnavailable
+		} else if maxRelays > 0 {
+			threshold := int(float64(maxRelays) * 0.8)
+			if activeRelays == maxRelays {
+				status = "healthy"
+				color = "green"
+				statusCode = http.StatusOK
+			} else if activeRelays >= threshold {
+				status = "degraded"
+				color = "yellow"
+				statusCode = http.StatusOK
+			} else {
+				status = "unhealthy"
+				color = "red"
+				statusCode = http.StatusServiceUnavailable
+			}
+		} else {
+			// Fallback if maxRelays is not available
+			status = "healthy"
+			color = "green"
+			statusCode = http.StatusOK
 		}
 
 		healthResponse := json.NewJsonObject()
 		healthResponse.Set("status", json.NewJsonValue(status))
+		healthResponse.Set("color", json.NewJsonValue(color))
 		healthResponse.Set("total_relays", json.NewJsonValue(totalRelays))
 		healthResponse.Set("active_relays", json.NewJsonValue(activeRelays))
+		healthResponse.Set("max_relays", json.NewJsonValue(maxRelays))
 		healthResponse.Set("timestamp", json.NewJsonValue(time.Now().Unix()))
 
 		w.Header().Set("Content-Type", "application/json")
-
-		// Set HTTP status code based on health
-		switch status {
-		case "healthy":
-			w.WriteHeader(http.StatusOK)
-		case "degraded":
-			w.WriteHeader(http.StatusOK) // Still OK but with warning
-		case "unhealthy":
-			w.WriteHeader(http.StatusServiceUnavailable)
-		}
+		w.WriteHeader(statusCode)
 
 		// Marshal to JSON
 		jsonData, err := json.MarshalIndent(healthResponse, "", "  ")
