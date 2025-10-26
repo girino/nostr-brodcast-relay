@@ -10,7 +10,6 @@ github.com/bep/debounce v1.2.1/go.mod h1:H8yggRPQKLUhUoqrJC1bO2xNya7vanpDl7xR3IS
 github.com/btcsuite/btcd v0.20.1-beta/go.mod h1:wVuoA8VJLEcwgqHBwHmzLRazpKxTv13Px/pDuV7OomQ=
 github.com/btcsuite/btcd v0.22.0-beta.0.20220111032746-97732e52810c/go.mod h1:tjmYdS6MLJ5/s0Fj4DbLgSbDHbEqLJrtnHecBFkdz5M=
 github.com/btcsuite/btcd v0.23.5-0.20231215221805-96c9fd8078fd/go.mod h1:nm3Bko6zh6bWP60UxwoT5LzdGJsQJaPo6HjduXq9p6A=
-github.com/btcsuite/btcd v0.24.2 h1:aLmxPguqxza+4ag8R1I2nnJjSu2iFn/kqtHTIImswcY=
 github.com/btcsuite/btcd/btcec/v2 v2.1.0/go.mod h1:2VzYrv4Gm4apmbVVsSq5bqf1Ec8v56E48Vt0Y/umPgA=
 github.com/btcsuite/btcd/btcec/v2 v2.1.3/go.mod h1:ctjw4H1kknNJmRN4iP1R7bTQ+v3GJkZBd6mui8ZsAZE=
 github.com/btcsuite/btcd/btcec/v2 v2.3.4 h1:3EJjcN70HCu/mwqlUsGK8GcNVyLVxFDlWurTXGPFfiQ=
@@ -56,8 +55,8 @@ github.com/decred/dcrd/lru v1.0.0/go.mod h1:mxKOwFd7lFjN2GZYsiz/ecgqR6kkYAl+0pz0
 github.com/dvyukov/go-fuzz v0.0.0-20200318091601-be3528f3a813/go.mod h1:11Gm+ccJnvAhCNLlf5+cS9KjtbaD5I5zaZpFMsTHWTw=
 github.com/fasthttp/websocket v1.5.12 h1:e4RGPpWW2HTbL3zV0Y/t7g0ub294LkiuXXUuTOUInlE=
 github.com/fasthttp/websocket v1.5.12/go.mod h1:I+liyL7/4moHojiOgUOIKEWm9EIxHqxZChS+aMFltyg=
-github.com/fiatjaf/eventstore v0.16.2 h1:h4rHwSwPcqAKqWUsAbYWUhDeSgm2Kp+PBkJc3FgBYu4=
-github.com/fiatjaf/eventstore v0.16.2/go.mod h1:0gU8fzYO/bG+NQAVlHtJWOlt3JKKFefh5Xjj2d1dLIs=
+github.com/fiatjaf/eventstore v0.17.2 h1:za22pVjHmU1Pi1Rq0sCjhDDt2HdKn1+bllGfnBuVkNw=
+github.com/fiatjaf/eventstore v0.17.2/go.mod h1:u5Hc0rwHm2O/atVfujfeZ4zzRb4uj0+X8WNZQbTGW8c=
 github.com/fiatjaf/khatru v0.19.1 h1:n2m+cL9pdeb8WMhIDYbjct7jCirS9eHuMR0R7i2JGjw=
 github.com/fiatjaf/khatru v0.19.1/go.mod h1:oYPexfQRBIDUPXWrPXjPqJksKCuK3Moc++rUI6Ubdb8=
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=

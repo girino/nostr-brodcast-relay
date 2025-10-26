@@ -8,13 +8,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/girino/broadcast-relay/broadcaster"
 	"github.com/girino/broadcast-relay/config"
-	"github.com/girino/broadcast-relay/discovery"
-	"github.com/girino/broadcast-relay/health"
-	"github.com/girino/broadcast-relay/logging"
-	"github.com/girino/broadcast-relay/manager"
 	"github.com/girino/broadcast-relay/relay"
+	"github.com/girino/nostr-lib/broadcast"
+	"github.com/girino/nostr-lib/logging"
 )
 
 func main() {
@@ -24,15 +21,20 @@ func main() {
 	flag.StringVar(&verbose, "v", "", "Enable verbose logging (shorthand)")
 	flag.Parse()
 
+	// Load configuration
+	cfg := config.Load()
+
+	// Use config's verbose setting if command line verbose is empty
+	if verbose == "" {
+		verbose = cfg.Verbose
+	}
+
 	// Set verbose mode in logging package
 	logging.SetVerbose(verbose)
 
 	logging.Info("==============================================================")
 	logging.Info("=== BROADCAST RELAY STARTING ===")
 	logging.Info("==============================================================")
-
-	// Load configuration
-	cfg := config.Load()
 	logging.Info("")
 	logging.Info("Configuration loaded:")
 	logging.Info("  - Seed relays: %d", len(cfg.SeedRelays))
@@ -55,34 +57,44 @@ func main() {
 
 	// Initialize components
 	logging.Info("Initializing components...")
-	mgr := manager.NewManager(cfg.TopNRelays, cfg.SuccessRateDecay)
-	checker := health.NewChecker(mgr, cfg.InitialTimeout)
-	disc := discovery.NewDiscovery(mgr, checker)
-	bc := broadcaster.NewBroadcaster(mgr, checker, cfg.MandatoryRelays, cfg.WorkerCount, cfg.CacheTTL)
+
+	// Create broadcast system configuration
+	broadcastConfig := &broadcast.Config{
+		TopNRelays:       cfg.TopNRelays,
+		SuccessRateDecay: cfg.SuccessRateDecay,
+		MandatoryRelays:  cfg.MandatoryRelays,
+		WorkerCount:      cfg.WorkerCount,
+		CacheTTL:         cfg.CacheTTL,
+		InitialTimeout:   cfg.InitialTimeout,
+	}
+
+	// Create unified broadcast system
+	broadcastSystem := broadcast.NewBroadcastSystem(broadcastConfig)
+
+	// Get health checker from broadcast system
+	checker := broadcastSystem.GetHealthChecker()
 	logging.Info("")
 
 	// Add mandatory relays to the manager for tracking
 	if len(cfg.MandatoryRelays) > 0 {
 		logging.Info("Adding mandatory relays to manager for tracking...")
-		for _, url := range cfg.MandatoryRelays {
-			mgr.AddMandatoryRelay(url)
-		}
+		broadcastSystem.AddMandatoryRelays(cfg.MandatoryRelays)
 	}
 
 	// Initial relay discovery and testing
 	logging.Info("========== PHASE 1: DISCOVERY & TESTING ==========")
 	ctx := context.Background()
-	disc.DiscoverFromSeeds(ctx, cfg.SeedRelays)
+	broadcastSystem.DiscoverFromSeeds(ctx, cfg.SeedRelays)
 	logging.Info("")
 
 	// Mark manager as initialized to switch to exponential decay
-	mgr.MarkInitialized()
+	broadcastSystem.MarkInitialized()
 	logging.Info("")
 
 	// Log initial top relays
 	logging.Info("========== PHASE 2: INITIAL RELAY SELECTION ==========")
-	topRelays := mgr.GetTopRelays()
-	logging.Info("Selected top %d relays from %d total relays", len(topRelays), mgr.GetRelayCount())
+	topRelays := broadcastSystem.GetTopRelays()
+	logging.Info("Selected top %d relays from %d total relays", len(topRelays), broadcastSystem.GetRelayCount())
 	logging.Debug("Top 10 relays:")
 	for i, r := range topRelays {
 		if i < 10 { // Show top 10
@@ -95,16 +107,16 @@ func main() {
 
 	// Start periodic refresh
 	logging.Info("Starting periodic refresh background task...")
-	go startPeriodicRefresh(ctx, cfg, disc, mgr)
+	go startPeriodicRefresh(ctx, cfg, broadcastSystem)
 
-	// Start the broadcaster worker pool
-	logging.Info("Starting broadcaster worker pool...")
-	bc.Start()
+	// Start the broadcast system
+	logging.Info("Starting broadcast system...")
+	broadcastSystem.Start()
 
 	// Start the relay server
 	logging.Info("")
 	logging.Info("========== PHASE 3: STARTING RELAY SERVER ==========")
-	relayServer := relay.NewRelay(cfg, bc, disc)
+	relayServer := relay.NewRelay(cfg, broadcastSystem, checker)
 
 	// Handle graceful shutdown
 	sigChan := make(chan os.Signal, 1)
@@ -134,19 +146,19 @@ func main() {
 	logging.Info("=== SHUTTING DOWN GRACEFULLY ===")
 	logging.Info("==============================================================")
 
-	// Stop the broadcaster worker pool
-	bc.Stop()
+	// Stop the broadcast system
+	broadcastSystem.Stop()
 
 	// Print final stats
-	stats := bc.GetStats()
+	finalStats := broadcastSystem.GetStats()
 	logging.Info("Final stats:")
-	logging.Info("  - Total relays: %v", stats["total_relays"])
-	logging.Info("  - Active relays: %v", stats["active_relays"])
+	logging.Info("  - Total relays: %d", finalStats.Manager.TotalRelays)
+	logging.Info("  - Active relays: %d", len(finalStats.Manager.TopRelays))
 	logging.Info("")
 	logging.Info("Goodbye!")
 }
 
-func startPeriodicRefresh(ctx context.Context, cfg *config.Config, disc *discovery.Discovery, mgr *manager.Manager) {
+func startPeriodicRefresh(ctx context.Context, cfg *config.Config, broadcastSystem *broadcast.BroadcastSystem) {
 	ticker := time.NewTicker(cfg.RefreshInterval)
 	defer ticker.Stop()
 
@@ -158,10 +170,10 @@ func startPeriodicRefresh(ctx context.Context, cfg *config.Config, disc *discove
 			logging.Info("Starting periodic relay refresh...")
 			logging.Debug("==============================================================")
 
-			disc.DiscoverFromSeeds(ctx, cfg.SeedRelays)
+			broadcastSystem.DiscoverFromSeeds(ctx, cfg.SeedRelays)
 
-			topRelays := mgr.GetTopRelays()
-			logging.Info("Refresh complete: %d top relays from %d total relays", len(topRelays), mgr.GetRelayCount())
+			topRelays := broadcastSystem.GetTopRelays()
+			logging.Info("Refresh complete: %d top relays from %d total relays", len(topRelays), broadcastSystem.GetRelayCount())
 			logging.Debug("==============================================================")
 			logging.Debug("")
 

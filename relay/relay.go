@@ -2,35 +2,37 @@ package relay
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"math/rand"
 	"net/http"
+	"time"
 
 	"github.com/fiatjaf/khatru"
-	"github.com/girino/broadcast-relay/broadcaster"
 	"github.com/girino/broadcast-relay/config"
-	"github.com/girino/broadcast-relay/discovery"
-	"github.com/girino/broadcast-relay/logging"
+	"github.com/girino/nostr-lib/broadcast"
+	"github.com/girino/nostr-lib/broadcast/health"
+	"github.com/girino/nostr-lib/logging"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip19"
 )
 
 type Relay struct {
-	khatru      *khatru.Relay
-	broadcaster *broadcaster.Broadcaster
-	discovery   *discovery.Discovery
-	config      *config.Config
-	port        string
+	khatru          *khatru.Relay
+	broadcastSystem *broadcast.BroadcastSystem
+	healthChecker   *health.Checker
+	config          *config.Config
+	port            string
 }
 
-func NewRelay(cfg *config.Config, bc *broadcaster.Broadcaster, disc *discovery.Discovery) *Relay {
+func NewRelay(cfg *config.Config, broadcastSystem *broadcast.BroadcastSystem, healthChecker *health.Checker) *Relay {
 	r := &Relay{
-		khatru:      khatru.NewRelay(),
-		broadcaster: bc,
-		discovery:   disc,
-		config:      cfg,
-		port:        cfg.RelayPort,
+		khatru:          khatru.NewRelay(),
+		broadcastSystem: broadcastSystem,
+		healthChecker:   healthChecker,
+		config:          cfg,
+		port:            cfg.RelayPort,
 	}
 
 	r.setupRelay()
@@ -98,7 +100,7 @@ func (r *Relay) setupRelay() {
 	relay.RejectEvent = append(relay.RejectEvent,
 		func(ctx context.Context, event *nostr.Event) (bool, string) {
 			// Check if event was already broadcast
-			if r.broadcaster.IsEventCached(event.ID) {
+			if r.broadcastSystem.IsEventCached(event.ID) {
 				logging.DebugMethod("relay", "RejectEvent", "Rejecting duplicate event %s (kind %d)", event.ID, event.Kind)
 				return true, "duplicate: event already broadcast"
 			}
@@ -157,17 +159,17 @@ func (r *Relay) handleEvent(event *nostr.Event) {
 	logging.Debug("Relay: Received event id=%s, kind=%d, author=%s", event.ID, event.Kind, event.PubKey[:16]+"...")
 
 	// Extract relay URLs from the event (works for all event kinds)
-	relays := r.discovery.ExtractRelaysFromEvent(event)
+	relays := r.broadcastSystem.ExtractRelaysFromEvent(event)
 
 	if len(relays) > 0 {
 		logging.Debug("Relay: Extracted %d relay URLs from event %s (kind %d)", len(relays), event.ID, event.Kind)
 		for _, relayURL := range relays {
-			r.discovery.AddRelayIfNew(relayURL)
+			r.broadcastSystem.AddRelayIfNew(relayURL)
 		}
 	}
 
 	// Broadcast the event to top N relays
-	r.broadcaster.Broadcast(event)
+	r.broadcastSystem.BroadcastEvent(event)
 }
 
 // Start starts the relay server
@@ -201,85 +203,79 @@ func (r *Relay) Start() error {
 
 	// Add a stats endpoint
 	mux.HandleFunc("/stats", func(w http.ResponseWriter, req *http.Request) {
-		stats := r.broadcaster.GetStats()
+		// Use the generic stats collector
+		statsCollector := r.broadcastSystem.GetStatsCollector()
+		allStats := statsCollector.GetAllStats()
+
+		// Add timestamp
+		allStats["timestamp"] = time.Now().Unix()
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 
-		// Simple JSON formatting
-		fmt.Fprintf(w, "{\n")
-		fmt.Fprintf(w, "  \"total_relays\": %d,\n", stats["total_relays"])
-		fmt.Fprintf(w, "  \"active_relays\": %d,\n", stats["active_relays"])
-		fmt.Fprintf(w, "  \"mandatory_relays\": %d,\n", stats["mandatory_relays"])
-
-		// Queue stats
-		queue := stats["queue"].(map[string]interface{})
-		fmt.Fprintf(w, "  \"queue\": {\n")
-		fmt.Fprintf(w, "    \"worker_count\": %d,\n", queue["worker_count"])
-		fmt.Fprintf(w, "    \"channel_size\": %d,\n", queue["channel_size"])
-		fmt.Fprintf(w, "    \"channel_capacity\": %d,\n", queue["channel_capacity"])
-		fmt.Fprintf(w, "    \"channel_utilization\": %.2f,\n", queue["channel_utilization"])
-		fmt.Fprintf(w, "    \"overflow_size\": %d,\n", queue["overflow_size"])
-		fmt.Fprintf(w, "    \"total_queued\": %d,\n", queue["total_queued"])
-		fmt.Fprintf(w, "    \"peak_size\": %d,\n", queue["peak_size"])
-		fmt.Fprintf(w, "    \"saturation_count\": %d,\n", queue["saturation_count"])
-		fmt.Fprintf(w, "    \"is_saturated\": %v,\n", queue["is_saturated"])
-		fmt.Fprintf(w, "    \"last_saturation\": \"%v\"\n", queue["last_saturation"])
-		fmt.Fprintf(w, "  },\n")
-
-		// Cache stats
-		cache := stats["cache"].(map[string]interface{})
-		fmt.Fprintf(w, "  \"cache\": {\n")
-		fmt.Fprintf(w, "    \"size\": %d,\n", cache["size"])
-		fmt.Fprintf(w, "    \"max_size\": %d,\n", cache["max_size"])
-		fmt.Fprintf(w, "    \"utilization_pct\": %.2f,\n", cache["utilization_pct"])
-		fmt.Fprintf(w, "    \"hits\": %d,\n", cache["hits"])
-		fmt.Fprintf(w, "    \"misses\": %d,\n", cache["misses"])
-		fmt.Fprintf(w, "    \"hit_rate_pct\": %.2f\n", cache["hit_rate_pct"])
-		fmt.Fprintf(w, "  },\n")
-
-		// Mandatory relays
-		mandatoryRelays := stats["mandatory_relay_list"].([]map[string]interface{})
-		fmt.Fprintf(w, "  \"mandatory_relay_list\": [\n")
-		for i, relay := range mandatoryRelays {
-			fmt.Fprintf(w, "    {\n")
-			fmt.Fprintf(w, "      \"url\": \"%s\",\n", relay["url"])
-			fmt.Fprintf(w, "      \"score\": %.2f,\n", relay["score"])
-			fmt.Fprintf(w, "      \"success_rate\": %.4f,\n", relay["success_rate"])
-			fmt.Fprintf(w, "      \"avg_response_ms\": %d,\n", relay["avg_response_ms"])
-			fmt.Fprintf(w, "      \"total_attempts\": %d\n", relay["total_attempts"])
-			if i < len(mandatoryRelays)-1 {
-				fmt.Fprintf(w, "    },\n")
-			} else {
-				fmt.Fprintf(w, "    }\n")
-			}
-		}
-		fmt.Fprintf(w, "  ],\n")
-
-		fmt.Fprintf(w, "  \"top_relays\": [\n")
-
-		topRelays := stats["top_relays"].([]map[string]interface{})
-		for i, relay := range topRelays {
-			fmt.Fprintf(w, "    {\n")
-			fmt.Fprintf(w, "      \"url\": \"%s\",\n", relay["url"])
-			fmt.Fprintf(w, "      \"score\": %.2f,\n", relay["score"])
-			fmt.Fprintf(w, "      \"success_rate\": %.4f,\n", relay["success_rate"])
-			fmt.Fprintf(w, "      \"avg_response_ms\": %d,\n", relay["avg_response_ms"])
-			fmt.Fprintf(w, "      \"total_attempts\": %d\n", relay["total_attempts"])
-			if i < len(topRelays)-1 {
-				fmt.Fprintf(w, "    },\n")
-			} else {
-				fmt.Fprintf(w, "    }\n")
-			}
+		// Marshal to JSON
+		jsonData, err := json.MarshalIndent(allStats, "", "  ")
+		if err != nil {
+			logging.Error("Failed to marshal stats to JSON: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
 		}
 
-		fmt.Fprintf(w, "  ]\n")
-		fmt.Fprintf(w, "}\n")
+		w.Write(jsonData)
+	})
+
+	// Add a health endpoint
+	mux.HandleFunc("/health", func(w http.ResponseWriter, req *http.Request) {
+		// Get basic health information
+		stats := r.broadcastSystem.GetStats()
+
+		// Extract health information from structured stats
+		totalRelays := stats.Manager.TotalRelays
+		activeRelays := len(stats.Manager.TopRelays)
+
+		// Determine health status
+		status := "healthy"
+		if totalRelays == 0 {
+			status = "unhealthy"
+		} else if activeRelays == 0 {
+			status = "degraded"
+		}
+
+		healthResponse := map[string]interface{}{
+			"status":        status,
+			"total_relays":  totalRelays,
+			"active_relays": activeRelays,
+			"timestamp":     stats.Timestamp,
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+
+		// Set HTTP status code based on health
+		switch status {
+		case "healthy":
+			w.WriteHeader(http.StatusOK)
+		case "degraded":
+			w.WriteHeader(http.StatusOK) // Still OK but with warning
+		case "unhealthy":
+			w.WriteHeader(http.StatusServiceUnavailable)
+		}
+
+		// Marshal to JSON
+		jsonData, err := json.MarshalIndent(healthResponse, "", "  ")
+		if err != nil {
+			logging.Error("Failed to marshal health to JSON: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+
+		w.Write(jsonData)
 	})
 
 	addr := fmt.Sprintf(":%s", r.port)
 	logging.Info("Relay: Starting relay server on %s", addr)
 	logging.Debug("Relay: WebSocket endpoint ready")
 	logging.Debug("Relay: Stats endpoint ready")
+	logging.Debug("Relay: Health endpoint ready")
 	logging.Debug("Relay: Main page endpoint ready")
 
 	return http.ListenAndServe(addr, mux)
