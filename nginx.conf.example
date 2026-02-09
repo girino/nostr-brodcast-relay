@@ -97,9 +97,9 @@ server {
 
     # WebSocket and HTTP requests to relay
     location / {
-        # Reject Tor exit traffic (CF-IPCountry = T1 from Cloudflare)
+        # Drop Tor exit traffic (CF-IPCountry = T1 from Cloudflare); 444 = close connection without response
         if ($block_tor) {
-            return 403;
+            return 444;
         }
 
         # Proxy to upstream
