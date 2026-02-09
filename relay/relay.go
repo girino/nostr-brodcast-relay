@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/fiatjaf/khatru"
-	"github.com/girino/broadcast-relay/config"
+	"github.com/girino/nostr-brodcast-relay/config"
 	"github.com/girino/nostr-lib/broadcast"
 	"github.com/girino/nostr-lib/broadcast/health"
 	json "github.com/girino/nostr-lib/json"

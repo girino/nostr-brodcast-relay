@@ -8,8 +8,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/girino/broadcast-relay/config"
-	"github.com/girino/broadcast-relay/relay"
+	"github.com/girino/nostr-brodcast-relay/config"
+	"github.com/girino/nostr-brodcast-relay/relay"
 	"github.com/girino/nostr-lib/broadcast"
 	json "github.com/girino/nostr-lib/json"
 	"github.com/girino/nostr-lib/logging"
