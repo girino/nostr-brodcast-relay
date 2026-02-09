@@ -97,6 +97,7 @@ services:
       - AUTOHEAL_INTERVAL=10
       - AUTOHEAL_START_PERIOD=30
       - AUTOHEAL_DEFAULT_STOP_TIMEOUT=10
+      - WEBHOOK_URL=${AUTOHEAL_WEBHOOK_URL:-}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
