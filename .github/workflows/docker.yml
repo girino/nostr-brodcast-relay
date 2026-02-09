@@ -1,14 +1,10 @@
 name: Docker Build and Push
 
+# Only build Docker on semantic version tags (e.g. v1.0.0, v1.1.1-dev, v1.0.0-SNAPSHOT), not on every commit.
 on:
   push:
-    branches:
-      - main
     tags:
       - 'v*'
-  pull_request:
-    branches:
-      - main
 
 env:
   REGISTRY: ghcr.io
