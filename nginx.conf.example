@@ -1,7 +1,11 @@
 # Nginx Site Configuration for Broadcast Relay
 # This configuration is for nginx running on the HOST machine (not in Docker)
 # The relay runs in Docker and is exposed on localhost:3334
-# 
+#
+# Cloudflare: Enable "IP Geolocation" in Cloudflare Dashboard > Network, and optionally
+# "Add visitor location headers" in Rules > Settings > Managed Transforms for full
+# location fields (city, continent, region, timezone, etc.).
+#
 # Installation:
 # 1. Copy this file: sudo cp nginx.conf.example /etc/nginx/sites-available/broadcast-relay
 # 2. Edit server_name: sudo nano /etc/nginx/sites-available/broadcast-relay
@@ -25,6 +29,56 @@ map $http_upgrade $connection_upgrade {
     '' close;
 }
 
+# Block Tor exit traffic (Cloudflare sets CF-IPCountry to T1 for Tor)
+map $http_cf_ipcountry $block_tor {
+    "T1"  1;
+    default 0;
+}
+
+# --- Cloudflare real IP: trust CF and use CF-Connecting-IP as client IP ---
+# When request comes from Cloudflare, $remote_addr will be the visitor's real IP.
+# Ranges from https://www.cloudflare.com/ips-v4 and https://www.cloudflare.com/ips-v6
+# Update periodically (e.g. cron) or use include /etc/nginx/cloudflare-ips.conf;
+set_real_ip_from 173.245.48.0/20;
+set_real_ip_from 103.21.244.0/22;
+set_real_ip_from 103.22.200.0/22;
+set_real_ip_from 103.31.4.0/22;
+set_real_ip_from 141.101.64.0/18;
+set_real_ip_from 108.162.192.0/18;
+set_real_ip_from 190.93.240.0/20;
+set_real_ip_from 188.114.96.0/20;
+set_real_ip_from 197.234.240.0/22;
+set_real_ip_from 198.41.128.0/17;
+set_real_ip_from 162.158.0.0/15;
+set_real_ip_from 104.16.0.0/13;
+set_real_ip_from 104.24.0.0/14;
+set_real_ip_from 172.64.0.0/13;
+set_real_ip_from 131.0.72.0/22;
+set_real_ip_from 2400:cb00::/32;
+set_real_ip_from 2606:4700::/32;
+set_real_ip_from 2803:f800::/32;
+set_real_ip_from 2405:b500::/32;
+set_real_ip_from 2405:8100::/32;
+set_real_ip_from 2a06:98c0::/29;
+set_real_ip_from 2c0f:f248::/32;
+real_ip_header CF-Connecting-IP;
+real_ip_recursive on;
+
+# Extended log format including Cloudflare headers (country, city, ray, etc.)
+# Headers present only when traffic is proxied through Cloudflare; optional location
+# headers require "Add visitor location headers" Managed Transform in Cloudflare.
+log_format broadcast_relay_cf '$remote_addr - $remote_user [$time_local] "$request" '
+    '$status $body_bytes_sent "$http_referer" "$http_user_agent" '
+    'cf_connecting_ip="$http_cf_connecting_ip" cf_country="$http_cf_ipcountry" '
+    'cf_city="$http_cf_ipcity" cf_continent="$http_cf_ipcontinent" '
+    'cf_region="$http_cf_region" cf_region_code="$http_cf_region_code" '
+    'cf_lat="$http_cf_iplatitude" cf_lon="$http_cf_iplongitude" '
+    'cf_metro="$http_cf_metro_code" cf_postal="$http_cf_postal_code" cf_tz="$http_cf_timezone" '
+    'cf_ray="$http_cf_ray" cf_visitor="$http_cf_visitor" '
+    'cf_connecting_ipv6="$http_cf_connecting_ipv6" cf_pseudo_ipv4="$http_cf_pseudo_ipv4" '
+    'cf_ew_via="$http_cf_ew_via" cf_worker="$http_cf_worker" '
+    'x_forwarded_for="$http_x_forwarded_for" x_forwarded_proto="$http_x_forwarded_proto"';
+
 # HTTP server block
 server {
     listen 80;
@@ -33,8 +87,8 @@ server {
     # Change to your domain name
     server_name relay.example.com;
     
-    # Logging
-    access_log /var/log/nginx/broadcast-relay-access.log;
+    # Logging (extended format with Cloudflare headers)
+    access_log /var/log/nginx/broadcast-relay-access.log broadcast_relay_cf;
     error_log /var/log/nginx/broadcast-relay-error.log warn;
 
     # Client body size (for large events)
@@ -42,6 +96,11 @@ server {
 
     # WebSocket and HTTP requests to relay
     location / {
+        # Reject Tor exit traffic (CF-IPCountry = T1 from Cloudflare)
+        if ($block_tor) {
+            return 403;
+        }
+
         # Proxy to upstream
         proxy_pass http://broadcast_relay;
         proxy_http_version 1.1;
@@ -50,11 +109,15 @@ server {
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection $connection_upgrade;
         
-        # Standard proxy headers
+        # Standard proxy headers ($remote_addr is real client IP when request is from Cloudflare)
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        # Pass through Cloudflare headers so the app can use them
+        proxy_set_header CF-Connecting-IP $http_cf_connecting_ip;
+        proxy_set_header CF-IPCountry $http_cf_ipcountry;
+        proxy_set_header CF-Ray $http_cf_ray;
         
         # Timeouts for long-lived WebSocket connections
         # Nostr relays keep connections open for subscriptions
