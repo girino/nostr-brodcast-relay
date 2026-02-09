@@ -37,6 +37,12 @@ map $http_cf_ipcountry $block_tor {
     default 0;
 }
 
+# For conditional access logging: log to main only when not Tor
+map $block_tor $log_main {
+    0  1;
+    default 0;
+}
+
 # Extended log format including Cloudflare headers (country, city, ray, etc.)
 # Headers present only when traffic is proxied through Cloudflare; optional location
 # headers require "Add visitor location headers" Managed Transform in Cloudflare.
@@ -88,8 +94,9 @@ server {
     real_ip_header CF-Connecting-IP;
     real_ip_recursive on;
     
-    # Logging (extended format with Cloudflare headers)
-    access_log /var/log/nginx/broadcast-relay-access.log broadcast_relay_cf;
+    # Logging: Tor-blocked requests to separate file, all others to main access log
+    access_log /var/log/nginx/broadcast-relay-tor.log broadcast_relay_cf if=$block_tor;
+    access_log /var/log/nginx/broadcast-relay-access.log broadcast_relay_cf if=$log_main;
     error_log /var/log/nginx/broadcast-relay-error.log warn;
 
     # Client body size (for large events)

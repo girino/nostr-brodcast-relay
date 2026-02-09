@@ -98,33 +98,49 @@ func (r *Relay) setupRelay() {
 
 	// Note: Banner is shown on main page but not in NIP-11 (not a standard field)
 
-	// Rate limits: by IP (connection, events, filters) using khatru policies
+	// Rate limits: by IP (connection, events, filters) using khatru policies.
+	// Limiters are created once here; wrappers only log on reject (no per-request allocation).
 	if r.config.RateLimitConnection.Enabled() {
-		relay.RejectConnection = append(relay.RejectConnection,
-			policies.ConnectionRateLimiter(
-				r.config.RateLimitConnection.Tokens,
-				r.config.RateLimitConnection.Interval,
-				r.config.RateLimitConnection.Max,
-			),
+		connectionLimiter := policies.ConnectionRateLimiter(
+			r.config.RateLimitConnection.Tokens,
+			r.config.RateLimitConnection.Interval,
+			r.config.RateLimitConnection.Max,
 		)
+		relay.RejectConnection = append(relay.RejectConnection, func(req *http.Request) bool {
+			reject := connectionLimiter(req)
+			if reject {
+				logging.Warn("Rate limit: rejected connection from %s", khatru.GetIPFromRequest(req))
+			}
+			return reject
+		})
 	}
 	if r.config.RateLimitEventIP.Enabled() {
-		relay.RejectEvent = append(relay.RejectEvent,
-			policies.EventIPRateLimiter(
-				r.config.RateLimitEventIP.Tokens,
-				r.config.RateLimitEventIP.Interval,
-				r.config.RateLimitEventIP.Max,
-			),
+		eventLimiter := policies.EventIPRateLimiter(
+			r.config.RateLimitEventIP.Tokens,
+			r.config.RateLimitEventIP.Interval,
+			r.config.RateLimitEventIP.Max,
 		)
+		relay.RejectEvent = append(relay.RejectEvent, func(ctx context.Context, event *nostr.Event) (bool, string) {
+			reject, msg := eventLimiter(ctx, event)
+			if reject {
+				logging.Warn("Rate limit: rejected event from IP %s: %s", khatru.GetIP(ctx), msg)
+			}
+			return reject, msg
+		})
 	}
 	if r.config.RateLimitFilterIP.Enabled() {
-		relay.RejectFilter = append(relay.RejectFilter,
-			policies.FilterIPRateLimiter(
-				r.config.RateLimitFilterIP.Tokens,
-				r.config.RateLimitFilterIP.Interval,
-				r.config.RateLimitFilterIP.Max,
-			),
+		filterLimiter := policies.FilterIPRateLimiter(
+			r.config.RateLimitFilterIP.Tokens,
+			r.config.RateLimitFilterIP.Interval,
+			r.config.RateLimitFilterIP.Max,
 		)
+		relay.RejectFilter = append(relay.RejectFilter, func(ctx context.Context, filter nostr.Filter) (bool, string) {
+			reject, msg := filterLimiter(ctx, filter)
+			if reject {
+				logging.Warn("Rate limit: rejected filter/REQ from IP %s: %s", khatru.GetIP(ctx), msg)
+			}
+			return reject, msg
+		})
 	}
 
 	// Reject cached events (duplicates)
