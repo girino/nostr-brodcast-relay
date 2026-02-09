@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/fiatjaf/khatru"
+	"github.com/fiatjaf/khatru/policies"
 	"github.com/girino/nostr-brodcast-relay/config"
 	"github.com/girino/nostr-lib/broadcast"
 	"github.com/girino/nostr-lib/broadcast/health"
@@ -96,6 +97,35 @@ func (r *Relay) setupRelay() {
 	relay.Info.Icon = r.config.RelayIcon
 
 	// Note: Banner is shown on main page but not in NIP-11 (not a standard field)
+
+	// Rate limits: by IP (connection, events, filters) using khatru policies
+	if r.config.RateLimitConnection.Enabled() {
+		relay.RejectConnection = append(relay.RejectConnection,
+			policies.ConnectionRateLimiter(
+				r.config.RateLimitConnection.Tokens,
+				r.config.RateLimitConnection.Interval,
+				r.config.RateLimitConnection.Max,
+			),
+		)
+	}
+	if r.config.RateLimitEventIP.Enabled() {
+		relay.RejectEvent = append(relay.RejectEvent,
+			policies.EventIPRateLimiter(
+				r.config.RateLimitEventIP.Tokens,
+				r.config.RateLimitEventIP.Interval,
+				r.config.RateLimitEventIP.Max,
+			),
+		)
+	}
+	if r.config.RateLimitFilterIP.Enabled() {
+		relay.RejectFilter = append(relay.RejectFilter,
+			policies.FilterIPRateLimiter(
+				r.config.RateLimitFilterIP.Tokens,
+				r.config.RateLimitFilterIP.Interval,
+				r.config.RateLimitFilterIP.Max,
+			),
+		)
+	}
 
 	// Reject cached events (duplicates)
 	relay.RejectEvent = append(relay.RejectEvent,
