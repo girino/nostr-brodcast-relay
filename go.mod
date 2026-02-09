@@ -1,9 +1,10 @@
 module github.com/girino/nostr-brodcast-relay
 
-go 1.25.2
+go 1.25.3
 
 require (
 	github.com/fiatjaf/khatru v0.19.1
+	github.com/girino/nostr-lib v0.0.0-20251026200009-86cf6b513bb1
 	github.com/nbd-wtf/go-nostr v0.52.0
 )
 
@@ -21,7 +22,7 @@ require (
 	github.com/decred/dcrd/crypto/blake256 v1.1.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
 	github.com/fasthttp/websocket v1.5.12 // indirect
-	github.com/fiatjaf/eventstore v0.16.2 // indirect
+	github.com/fiatjaf/eventstore v0.17.2 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect

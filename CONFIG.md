@@ -118,6 +118,21 @@ export RELAY_PORT=3334
 - **WebSocket:** `ws://localhost:3334/` - Main relay endpoint
 - **Stats:** `http://localhost:3334/stats` - JSON endpoint showing current relay statistics
 
+### VERBOSE
+**Default:** none
+
+Enable verbose logging. This environment variable has the same effect as the `--verbose` command line option. Command line options override environment variables.
+
+Examples:
+- `VERBOSE="all"` or `VERBOSE="true"` - Enable all debug logging
+- `VERBOSE="discovery,health"` - Enable debug logging for specific modules
+- `VERBOSE="broadcaster.addEventToCache"` - Enable debug logging for specific methods
+
+Example:
+```bash
+export VERBOSE="discovery,health"
+```
+
 ## Example Stats Response
 
 ```json

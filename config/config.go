@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/girino/broadcast-relay/logging"
+	"github.com/girino/nostr-lib/logging"
 )
 
 type Config struct {
@@ -21,6 +21,7 @@ type Config struct {
 	SuccessRateDecay    float64
 	WorkerCount         int
 	CacheTTL            time.Duration
+	Verbose             string
 	// Relay metadata
 	RelayName        string
 	RelayDescription string
@@ -48,6 +49,7 @@ func Load() *Config {
 		SuccessRateDecay:    getEnvFloat("SUCCESS_RATE_DECAY", 0.95),
 		WorkerCount:         workerCount,
 		CacheTTL:            getEnvDuration("CACHE_TTL", 5*time.Minute),
+		Verbose:             getEnv("VERBOSE", ""),
 		// Relay metadata
 		RelayName:        getEnv("RELAY_NAME", "Broadcast Relay"),
 		RelayDescription: getEnv("RELAY_DESCRIPTION", "A Nostr relay that broadcasts events to multiple relays"),
