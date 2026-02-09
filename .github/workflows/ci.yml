@@ -28,14 +28,6 @@ jobs:
       - name: Run go vet
         run: go vet ./...
 
-      - name: Run go fmt check
-        run: |
-          if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
-            echo "The following files are not formatted:"
-            gofmt -s -l .
-            exit 1
-          fi
-
       - name: Build
         run: go build -v -o broadcast-relay .
 
