@@ -109,7 +109,7 @@ func (r *Relay) setupRelay() {
 		relay.RejectConnection = append(relay.RejectConnection, func(req *http.Request) bool {
 			reject := connectionLimiter(req)
 			if reject {
-				logging.Warn("Rate limit: rejected connection from %s", khatru.GetIPFromRequest(req))
+				logging.DebugMethod("relay", "rateLimitConnection", "rejected connection from %s", khatru.GetIPFromRequest(req))
 			}
 			return reject
 		})
@@ -123,7 +123,7 @@ func (r *Relay) setupRelay() {
 		relay.RejectEvent = append(relay.RejectEvent, func(ctx context.Context, event *nostr.Event) (bool, string) {
 			reject, msg := eventLimiter(ctx, event)
 			if reject {
-				logging.Warn("Rate limit: rejected event from IP %s: %s", khatru.GetIP(ctx), msg)
+				logging.DebugMethod("relay", "rateLimitEvent", "rejected event from IP %s: %s", khatru.GetIP(ctx), msg)
 			}
 			return reject, msg
 		})
@@ -137,7 +137,7 @@ func (r *Relay) setupRelay() {
 		relay.RejectFilter = append(relay.RejectFilter, func(ctx context.Context, filter nostr.Filter) (bool, string) {
 			reject, msg := filterLimiter(ctx, filter)
 			if reject {
-				logging.Warn("Rate limit: rejected filter/REQ from IP %s: %s", khatru.GetIP(ctx), msg)
+				logging.DebugMethod("relay", "rateLimitFilter", "rejected filter/REQ from IP %s: %s", khatru.GetIP(ctx), msg)
 			}
 			return reject, msg
 		})
