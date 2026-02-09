@@ -11,31 +11,41 @@ services:
       - .env
     environment:
       # Relay configuration
-      - RELAY_PORT=3334
-      - SEED_RELAYS=wss://relay.damus.io,wss://nos.lol,wss://relay.nostr.band
+      - RELAY_PORT=${RELAY_PORT:-3334}
+      - SEED_RELAYS=${SEED_RELAYS:-wss://relay.damus.io,wss://nos.lol,wss://relay.nostr.band}
       - MANDATORY_RELAYS=${MANDATORY_RELAYS:-}
       - TOP_N_RELAYS=${TOP_N_RELAYS:-50}
-      
-      # Worker configuration
-      - WORKER_COUNT=${WORKER_COUNT:-0}  # 0 = auto (2*CPU)
-      
-      # Cache configuration
-      - CACHE_TTL=${CACHE_TTL:-5m}
-      
       # Health and refresh intervals
       - REFRESH_INTERVAL=${REFRESH_INTERVAL:-24h}
       - HEALTH_CHECK_INTERVAL=${HEALTH_CHECK_INTERVAL:-5m}
       - INITIAL_TIMEOUT=${INITIAL_TIMEOUT:-5s}
-      
       # Performance tuning
       - SUCCESS_RATE_DECAY=${SUCCESS_RATE_DECAY:-0.95}
+      # Worker configuration (0 = auto: 2*CPU)
+      - WORKER_COUNT=${WORKER_COUNT:-0}
+      # Cache configuration
+      - CACHE_TTL=${CACHE_TTL:-5m}
+      # Logging
+      - VERBOSE=${VERBOSE:-}
+      # Relay metadata (NIP-11 and main page)
+      - RELAY_NAME=${RELAY_NAME:-Broadcast Relay}
+      - RELAY_DESCRIPTION=${RELAY_DESCRIPTION:-A Nostr relay that broadcasts events to multiple relays}
+      - RELAY_URL=${RELAY_URL:-}
+      - CONTACT_PUBKEY=${CONTACT_PUBKEY:-}
+      - RELAY_PRIVKEY=${RELAY_PRIVKEY:-}
+      - RELAY_ICON=${RELAY_ICON:-/static/icon1.png}
+      - RELAY_BANNERS=${RELAY_BANNERS:-}
+      # Rate limiting (tokens,interval,max; use "0,0,0" or "off" to disable)
+      - RATE_LIMIT_CONNECTION=${RATE_LIMIT_CONNECTION:-1,5m,100}
+      - RATE_LIMIT_EVENT_IP=${RATE_LIMIT_EVENT_IP:-2,3m,10}
+      - RATE_LIMIT_FILTER_IP=${RATE_LIMIT_FILTER_IP:-20,1m,100}
     networks:
       - relay-network
     ports:
       # Expose to host for nginx proxy
       - "127.0.0.1:3334:3334"
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3334/stats"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3334/health"]
       interval: 30s
       timeout: 10s
       retries: 3
