@@ -47,8 +47,14 @@ type Config struct {
 	RateLimitConnection RateLimitConfig // e.g. 5 connections per 1m, burst 20
 	RateLimitEventIP    RateLimitConfig // e.g. 10 events per 1s per IP, burst 30
 	RateLimitFilterIP   RateLimitConfig // e.g. 20 REQ per 1m per IP, burst 100
-	// RateLimitBanDuration: after a forced websocket close for event/filter rate limit, block new connections from that client IP for this long. 0 disables.
-	RateLimitBanDuration time.Duration
+	// RateLimitBanBaseDuration: first ban after a forced close, and again after a clean probation. 0 disables banning.
+	RateLimitBanBaseDuration time.Duration
+	// RateLimitBanMaxDuration: cap for exponential bans (probation violation scales previous ban by Repeat multiplier up to this).
+	RateLimitBanMaxDuration time.Duration
+	// RateLimitBanProbationMultiplier: probation length = last ban duration × this (default 1; 0 disables probation).
+	RateLimitBanProbationMultiplier float64
+	// RateLimitBanRepeatMultiplier: next ban after breaking probation = last ban × this (default 2; 0 disables escalation).
+	RateLimitBanRepeatMultiplier float64
 }
 
 func Load() *Config {
@@ -80,8 +86,11 @@ func Load() *Config {
 		// Rate limits: enabled by default, matching khatru policies.ApplySaneDefaults. Format "tokens,interval,max". Use "0,0,0" or "off" to disable.
 		RateLimitConnection: parseRateLimitWithDefault(getEnv("RATE_LIMIT_CONNECTION", "1,5m,100"), "1,5m,100"),   // 1 connection per 5m per IP, burst 100
 		RateLimitEventIP:    parseRateLimitWithDefault(getEnv("RATE_LIMIT_EVENT_IP", "2,3m,10"), "2,3m,10"),     // 2 events per 3m per IP, burst 10
-		RateLimitFilterIP:   parseRateLimitWithDefault(getEnv("RATE_LIMIT_FILTER_IP", "20,1m,100"), "20,1m,100"), // 20 REQ per 1m per IP, burst 100
-		RateLimitBanDuration: getEnvDuration("RATE_LIMIT_BAN_DURATION", 5*time.Minute),
+		RateLimitFilterIP: parseRateLimitWithDefault(getEnv("RATE_LIMIT_FILTER_IP", "20,1m,100"), "20,1m,100"), // 20 REQ per 1m per IP, burst 100
+		RateLimitBanBaseDuration: loadRateLimitBanBase(),
+		RateLimitBanMaxDuration:  getEnvDuration("RATE_LIMIT_BAN_MAX", 24*time.Hour),
+		RateLimitBanProbationMultiplier: getEnvFloat("RATE_LIMIT_BAN_PROBATION_MULTIPLIER", 1),
+		RateLimitBanRepeatMultiplier:    getEnvFloat("RATE_LIMIT_BAN_REPEAT_MULTIPLIER", 2),
 	}
 
 	logging.DebugMethod("config", "Load", "Loaded configuration: SeedRelays=%d, MandatoryRelays=%d, TopN=%d, Port=%s, Workers=%d",
@@ -122,6 +131,17 @@ func getEnvDuration(key string, defaultValue time.Duration) time.Duration {
 		}
 	}
 	return defaultValue
+}
+
+// loadRateLimitBanBase reads RATE_LIMIT_BAN_BASE, or falls back to RATE_LIMIT_BAN_DURATION for backward compatibility, default 1m.
+func loadRateLimitBanBase() time.Duration {
+	if v, ok := os.LookupEnv("RATE_LIMIT_BAN_BASE"); ok && v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			return d
+		}
+		return 0
+	}
+	return getEnvDuration("RATE_LIMIT_BAN_DURATION", 1*time.Minute)
 }
 
 func parseSeedRelays(seedStr string) []string {

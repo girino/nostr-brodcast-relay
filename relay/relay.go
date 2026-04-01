@@ -100,11 +100,14 @@ func (r *Relay) setupRelay() {
 
 	// Rate limits + optional IP ban: github.com/girino/nostr-brodcast-relay/ratelimit
 	ratelimit.New(ratelimit.Config{
-		Connection:      rateLimitBucket(r.config.RateLimitConnection),
-		EventIP:         rateLimitBucket(r.config.RateLimitEventIP),
-		FilterIP:        rateLimitBucket(r.config.RateLimitFilterIP),
-		SoftRejectCount: 3,
-		BanDuration:     r.config.RateLimitBanDuration,
+		Connection:               rateLimitBucket(r.config.RateLimitConnection),
+		EventIP:                  rateLimitBucket(r.config.RateLimitEventIP),
+		FilterIP:                 rateLimitBucket(r.config.RateLimitFilterIP),
+		SoftRejectCount:          3,
+		BaseBanDuration:          r.config.RateLimitBanBaseDuration,
+		MaxBanDuration:           r.config.RateLimitBanMaxDuration,
+		ProbationMultiplier:      r.config.RateLimitBanProbationMultiplier,
+		RepeatOffenderMultiplier: r.config.RateLimitBanRepeatMultiplier,
 		LogDebug: func(format string, args ...any) {
 			logging.DebugMethod("relay", "rateLimit", format, args...)
 		},

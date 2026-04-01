@@ -23,8 +23,16 @@ type Config struct {
 	// SoftRejectCount is how many rate-limit rejects per client IP only add a warning suffix before the next
 	// reject also closes the WebSocket and may ban. Default 3 → strikes 1–3 soft, 4th closes.
 	SoftRejectCount int
-	// BanDuration blocks new WebSocket upgrades from that client IP after a forced close. Zero disables.
-	BanDuration time.Duration
+
+	// BaseBanDuration is the first ban length after a forced close (and again after a clean probation). Zero disables all banning.
+	BaseBanDuration time.Duration
+	// MaxBanDuration caps escalating bans (each probation break scales the previous ban by RepeatOffenderMultiplier until this cap). Normalized default 24h if ≤ 0.
+	MaxBanDuration time.Duration
+
+	// ProbationMultiplier scales how long probation lasts after a ban: probation = lastBanDuration × ProbationMultiplier. Zero disables probation (no post-ban window; escalation reset when the ban ends).
+	ProbationMultiplier float64
+	// RepeatOffenderMultiplier scales the next ban after breaking probation: nextBan = lastBanDuration × RepeatOffenderMultiplier (then capped by MaxBanDuration). Zero disables escalation (next ban is BaseBanDuration).
+	RepeatOffenderMultiplier float64
 
 	// CloseReason is the WebSocket close payload (policy violation). Empty defaults to "rate limited".
 	CloseReason string
@@ -41,5 +49,8 @@ func (c *Config) normalize() {
 	}
 	if c.CloseReason == "" {
 		c.CloseReason = "rate limited"
+	}
+	if c.MaxBanDuration <= 0 {
+		c.MaxBanDuration = 24 * time.Hour
 	}
 }
