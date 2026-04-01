@@ -37,6 +37,8 @@ type Relay struct {
 	// Per-client-IP rate-limit strike count (event + filter share one counter per IP, matching khatru policies).
 	// Key is IP string, or "ws:0x..." when IP is unknown. Entry removed after we close a socket for rate limit.
 	rateLimitStrikes sync.Map
+	// Client IPs temporarily blocked from new WebSocket upgrades after a forced rate-limit disconnect (value = ban until time).
+	rateLimitIPBans sync.Map
 }
 
 func NewRelay(cfg *config.Config, broadcastSystem *broadcast.BroadcastSystem, healthChecker *health.Checker) *Relay {
@@ -113,6 +115,9 @@ func (r *Relay) setupRelay() {
 	// Limiters are created once here; wrappers only log on reject (no per-request allocation).
 	// Event and filter limits: first rateLimitSoftStrikes hits per client IP return a reject with a warning suffix;
 	// the next hit closes the current websocket (see closeKhatruWSOnRateLimit); strike count for that IP is then reset.
+	if r.config.RateLimitBanDuration > 0 {
+		relay.RejectConnection = append([]func(*http.Request) bool{r.rejectConnectionIfTemporaryIPBan}, relay.RejectConnection...)
+	}
 	if r.config.RateLimitConnection.Enabled() {
 		connectionLimiter := policies.ConnectionRateLimiter(
 			r.config.RateLimitConnection.Tokens,
@@ -140,8 +145,7 @@ func (r *Relay) setupRelay() {
 				wsTag := rateLimitWSTag(ws)
 				if closeConn {
 					logging.DebugMethod("relay", "rateLimitEvent", "closing ws=%s after %d rate-limit strikes for key=%q IP=%s (event): %s", wsTag, strike, strikeKey, rateLimitIPLog(ip), msg)
-					closeKhatruWSOnRateLimit(ctx)
-					r.rateLimitStrikes.Delete(strikeKey)
+					r.rateLimitForcedDisconnect(ctx, strikeKey, ip)
 					return reject, msg
 				}
 				logging.DebugMethod("relay", "rateLimitEvent", "rate-limit warning %d/%d ws=%s key=%q IP=%s (event): %s", strike, rateLimitSoftStrikes, wsTag, strikeKey, rateLimitIPLog(ip), msg)
@@ -164,8 +168,7 @@ func (r *Relay) setupRelay() {
 				wsTag := rateLimitWSTag(ws)
 				if closeConn {
 					logging.DebugMethod("relay", "rateLimitFilter", "closing ws=%s after %d rate-limit strikes for key=%q IP=%s (filter): %s", wsTag, strike, strikeKey, rateLimitIPLog(ip), msg)
-					closeKhatruWSOnRateLimit(ctx)
-					r.rateLimitStrikes.Delete(strikeKey)
+					r.rateLimitForcedDisconnect(ctx, strikeKey, ip)
 					return reject, msg
 				}
 				logging.DebugMethod("relay", "rateLimitFilter", "rate-limit warning %d/%d ws=%s key=%q IP=%s (filter): %s", strike, rateLimitSoftStrikes, wsTag, strikeKey, rateLimitIPLog(ip), msg)
@@ -273,6 +276,43 @@ func (r *Relay) rateLimitStrikeAfterReject(ctx context.Context) (strike int32, s
 	slot := actual.(*strikeCounter)
 	n := atomic.AddInt32(&slot.n, 1)
 	return n, n > rateLimitSoftStrikes, strikeKey, ip, ws
+}
+
+func (r *Relay) rejectConnectionIfTemporaryIPBan(req *http.Request) bool {
+	ip := khatru.GetIPFromRequest(req)
+	if ip == "" {
+		return false
+	}
+	v, ok := r.rateLimitIPBans.Load(ip)
+	if !ok {
+		return false
+	}
+	until, ok := v.(time.Time)
+	if !ok {
+		r.rateLimitIPBans.Delete(ip)
+		return false
+	}
+	if time.Now().After(until) {
+		r.rateLimitIPBans.Delete(ip)
+		return false
+	}
+	logging.DebugMethod("relay", "rateLimitBanIP", "rejected connection from temporarily banned IP %s (until %s)", ip, until.UTC().Format(time.RFC3339))
+	return true
+}
+
+func (r *Relay) rateLimitForcedDisconnect(ctx context.Context, strikeKey, ip string) {
+	closeKhatruWSOnRateLimit(ctx)
+	r.rateLimitStrikes.Delete(strikeKey)
+	r.rateLimitBanIPAfterForcedDisconnect(ip)
+}
+
+func (r *Relay) rateLimitBanIPAfterForcedDisconnect(ip string) {
+	if r.config.RateLimitBanDuration <= 0 || ip == "" {
+		return
+	}
+	until := time.Now().Add(r.config.RateLimitBanDuration)
+	r.rateLimitIPBans.Store(ip, until)
+	logging.DebugMethod("relay", "rateLimitBanIP", "temporarily banned IP %s from new connections until %s (ban window %v)", ip, until.UTC().Format(time.RFC3339), r.config.RateLimitBanDuration)
 }
 
 func (r *Relay) handleEvent(event *nostr.Event) {

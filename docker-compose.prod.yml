@@ -39,6 +39,7 @@ services:
       - RATE_LIMIT_CONNECTION=${RATE_LIMIT_CONNECTION:-1,5m,100}
       - RATE_LIMIT_EVENT_IP=${RATE_LIMIT_EVENT_IP:-2,3m,10}
       - RATE_LIMIT_FILTER_IP=${RATE_LIMIT_FILTER_IP:-20,1m,100}
+      - RATE_LIMIT_BAN_DURATION=${RATE_LIMIT_BAN_DURATION:-5m}
     networks:
       - relay-network
     ports:

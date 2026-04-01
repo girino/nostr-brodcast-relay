@@ -47,6 +47,8 @@ type Config struct {
 	RateLimitConnection RateLimitConfig // e.g. 5 connections per 1m, burst 20
 	RateLimitEventIP    RateLimitConfig // e.g. 10 events per 1s per IP, burst 30
 	RateLimitFilterIP   RateLimitConfig // e.g. 20 REQ per 1m per IP, burst 100
+	// RateLimitBanDuration: after a forced websocket close for event/filter rate limit, block new connections from that client IP for this long. 0 disables.
+	RateLimitBanDuration time.Duration
 }
 
 func Load() *Config {
@@ -79,6 +81,7 @@ func Load() *Config {
 		RateLimitConnection: parseRateLimitWithDefault(getEnv("RATE_LIMIT_CONNECTION", "1,5m,100"), "1,5m,100"),   // 1 connection per 5m per IP, burst 100
 		RateLimitEventIP:    parseRateLimitWithDefault(getEnv("RATE_LIMIT_EVENT_IP", "2,3m,10"), "2,3m,10"),     // 2 events per 3m per IP, burst 10
 		RateLimitFilterIP:   parseRateLimitWithDefault(getEnv("RATE_LIMIT_FILTER_IP", "20,1m,100"), "20,1m,100"), // 20 REQ per 1m per IP, burst 100
+		RateLimitBanDuration: getEnvDuration("RATE_LIMIT_BAN_DURATION", 5*time.Minute),
 	}
 
 	logging.DebugMethod("config", "Load", "Loaded configuration: SeedRelays=%d, MandatoryRelays=%d, TopN=%d, Port=%s, Workers=%d",
