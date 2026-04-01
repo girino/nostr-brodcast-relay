@@ -22,8 +22,8 @@ import (
 	"github.com/nbd-wtf/go-nostr/nip19"
 )
 
-// rateLimitSoftStrikes is how many rate-limited events or REQ (combined per WebSocket) get a normal
-// reject message with a warning suffix before we close the connection on the next hit.
+// rateLimitSoftStrikes is how many rate-limited events or REQ per client IP (same key as khatru IP limiters)
+// get a normal reject with a warning suffix before we close the current WebSocket on the next hit.
 const rateLimitSoftStrikes = 3
 
 type strikeCounter struct{ n int32 }
@@ -34,7 +34,8 @@ type Relay struct {
 	healthChecker   *health.Checker
 	config          *config.Config
 	port            string
-	// Per-WebSocket rate-limit strikes (event + filter share counter); cleared on disconnect.
+	// Per-client-IP rate-limit strike count (event + filter share one counter per IP, matching khatru policies).
+	// Key is IP string, or "ws:0x..." when IP is unknown. Entry removed after we close a socket for rate limit.
 	rateLimitStrikes sync.Map
 }
 
@@ -108,16 +109,10 @@ func (r *Relay) setupRelay() {
 
 	// Note: Banner is shown on main page but not in NIP-11 (not a standard field)
 
-	relay.OnDisconnect = append(relay.OnDisconnect, func(ctx context.Context) {
-		if ws := khatru.GetConnection(ctx); ws != nil {
-			r.rateLimitStrikes.Delete(ws)
-		}
-	})
-
 	// Rate limits: by IP (connection, events, filters) using khatru policies.
 	// Limiters are created once here; wrappers only log on reject (no per-request allocation).
-	// Event and filter limits: first rateLimitSoftStrikes hits return a reject with a warning suffix;
-	// the next hit closes the websocket (see closeKhatruWSOnRateLimit).
+	// Event and filter limits: first rateLimitSoftStrikes hits per client IP return a reject with a warning suffix;
+	// the next hit closes the current websocket (see closeKhatruWSOnRateLimit); strike count for that IP is then reset.
 	if r.config.RateLimitConnection.Enabled() {
 		connectionLimiter := policies.ConnectionRateLimiter(
 			r.config.RateLimitConnection.Tokens,
@@ -141,13 +136,15 @@ func (r *Relay) setupRelay() {
 		relay.RejectEvent = append(relay.RejectEvent, func(ctx context.Context, event *nostr.Event) (bool, string) {
 			reject, msg := eventLimiter(ctx, event)
 			if reject {
-				strike, closeConn := r.rateLimitStrikeAfterReject(ctx)
+				strike, closeConn, strikeKey, ip, ws := r.rateLimitStrikeAfterReject(ctx)
+				wsTag := rateLimitWSTag(ws)
 				if closeConn {
-					logging.DebugMethod("relay", "rateLimitEvent", "closing websocket after %d rate-limit strikes (event) from IP %s: %s", strike, khatru.GetIP(ctx), msg)
+					logging.DebugMethod("relay", "rateLimitEvent", "closing ws=%s after %d rate-limit strikes for key=%q IP=%s (event): %s", wsTag, strike, strikeKey, rateLimitIPLog(ip), msg)
 					closeKhatruWSOnRateLimit(ctx)
+					r.rateLimitStrikes.Delete(strikeKey)
 					return reject, msg
 				}
-				logging.DebugMethod("relay", "rateLimitEvent", "rate-limit warning %d/%d (event) from IP %s: %s", strike, rateLimitSoftStrikes, khatru.GetIP(ctx), msg)
+				logging.DebugMethod("relay", "rateLimitEvent", "rate-limit warning %d/%d ws=%s key=%q IP=%s (event): %s", strike, rateLimitSoftStrikes, wsTag, strikeKey, rateLimitIPLog(ip), msg)
 				warn := fmt.Sprintf("%s (warning %d/%d, connection closes on next rate limit)", msg, strike, rateLimitSoftStrikes)
 				return reject, warn
 			}
@@ -163,13 +160,15 @@ func (r *Relay) setupRelay() {
 		relay.RejectFilter = append(relay.RejectFilter, func(ctx context.Context, filter nostr.Filter) (bool, string) {
 			reject, msg := filterLimiter(ctx, filter)
 			if reject {
-				strike, closeConn := r.rateLimitStrikeAfterReject(ctx)
+				strike, closeConn, strikeKey, ip, ws := r.rateLimitStrikeAfterReject(ctx)
+				wsTag := rateLimitWSTag(ws)
 				if closeConn {
-					logging.DebugMethod("relay", "rateLimitFilter", "closing websocket after %d rate-limit strikes (filter) from IP %s: %s", strike, khatru.GetIP(ctx), msg)
+					logging.DebugMethod("relay", "rateLimitFilter", "closing ws=%s after %d rate-limit strikes for key=%q IP=%s (filter): %s", wsTag, strike, strikeKey, rateLimitIPLog(ip), msg)
 					closeKhatruWSOnRateLimit(ctx)
+					r.rateLimitStrikes.Delete(strikeKey)
 					return reject, msg
 				}
-				logging.DebugMethod("relay", "rateLimitFilter", "rate-limit warning %d/%d (filter) from IP %s: %s", strike, rateLimitSoftStrikes, khatru.GetIP(ctx), msg)
+				logging.DebugMethod("relay", "rateLimitFilter", "rate-limit warning %d/%d ws=%s key=%q IP=%s (filter): %s", strike, rateLimitSoftStrikes, wsTag, strikeKey, rateLimitIPLog(ip), msg)
 				warn := fmt.Sprintf("%s (warning %d/%d, connection closes on next rate limit)", msg, strike, rateLimitSoftStrikes)
 				return reject, warn
 			}
@@ -236,17 +235,44 @@ func (r *Relay) setupRelay() {
 	)
 }
 
-// rateLimitStrikeAfterReject increments per-WebSocket rate-limit strikes (events and filters share one counter).
-// strike is 1-based count for this reject; shouldClose is true after rateLimitSoftStrikes soft responses (close on the next hit).
-func (r *Relay) rateLimitStrikeAfterReject(ctx context.Context) (strike int32, shouldClose bool) {
-	ws := khatru.GetConnection(ctx)
-	if ws == nil {
-		return 0, false
+// rateLimitStrikeKey returns the map key for strike counting (client IP when known, else ws pointer).
+func rateLimitStrikeKey(ctx context.Context) (key string, ip string, ws *khatru.WebSocket) {
+	ws = khatru.GetConnection(ctx)
+	ip = khatru.GetIP(ctx)
+	if ip != "" {
+		return ip, ip, ws
 	}
-	actual, _ := r.rateLimitStrikes.LoadOrStore(ws, new(strikeCounter))
+	if ws != nil {
+		return fmt.Sprintf("ws:%p", ws), "", ws
+	}
+	return "", "", nil
+}
+
+func rateLimitWSTag(ws *khatru.WebSocket) string {
+	if ws == nil {
+		return "-"
+	}
+	return fmt.Sprintf("%p", ws)
+}
+
+func rateLimitIPLog(ip string) string {
+	if ip == "" {
+		return "-"
+	}
+	return ip
+}
+
+// rateLimitStrikeAfterReject increments per-client-IP strikes (events and filters share one counter per IP).
+// strikeKey is the sync.Map key; shouldClose is true after rateLimitSoftStrikes soft responses (close on the next hit).
+func (r *Relay) rateLimitStrikeAfterReject(ctx context.Context) (strike int32, shouldClose bool, strikeKey string, ip string, ws *khatru.WebSocket) {
+	strikeKey, ip, ws = rateLimitStrikeKey(ctx)
+	if strikeKey == "" {
+		return 0, false, "", ip, ws
+	}
+	actual, _ := r.rateLimitStrikes.LoadOrStore(strikeKey, new(strikeCounter))
 	slot := actual.(*strikeCounter)
 	n := atomic.AddInt32(&slot.n, 1)
-	return n, n > rateLimitSoftStrikes
+	return n, n > rateLimitSoftStrikes, strikeKey, ip, ws
 }
 
 func (r *Relay) handleEvent(event *nostr.Event) {
