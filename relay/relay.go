@@ -305,31 +305,37 @@ func (r *Relay) Start() error {
 		var status string
 		var color string
 		var statusCode int
+		var statusReason string
 
 		if totalRelays == 0 || activeRelays == 0 {
 			status = "unhealthy"
 			color = "red"
 			statusCode = http.StatusServiceUnavailable
+			statusReason = fmt.Sprintf("insufficient relay health: total_relays=%d active_relays=%d", totalRelays, activeRelays)
 		} else if maxRelays > 0 {
 			threshold := int(float64(maxRelays) * 0.8)
 			if activeRelays == maxRelays {
 				status = "healthy"
 				color = "green"
 				statusCode = http.StatusOK
+				statusReason = fmt.Sprintf("all relays active: active_relays=%d max_relays=%d", activeRelays, maxRelays)
 			} else if activeRelays >= threshold {
 				status = "degraded"
 				color = "yellow"
 				statusCode = http.StatusOK
+				statusReason = fmt.Sprintf("active relays below ideal but above threshold: active_relays=%d threshold=%d max_relays=%d", activeRelays, threshold, maxRelays)
 			} else {
 				status = "unhealthy"
 				color = "red"
 				statusCode = http.StatusServiceUnavailable
+				statusReason = fmt.Sprintf("active relays below threshold: active_relays=%d threshold=%d max_relays=%d", activeRelays, threshold, maxRelays)
 			}
 		} else {
 			// Fallback if maxRelays is not available
 			status = "healthy"
 			color = "green"
 			statusCode = http.StatusOK
+			statusReason = fmt.Sprintf("max relays unavailable fallback: total_relays=%d active_relays=%d", totalRelays, activeRelays)
 		}
 
 		healthResponse := json.NewJsonObject()
@@ -340,9 +346,6 @@ func (r *Relay) Start() error {
 		healthResponse.Set("max_relays", json.NewJsonValue(maxRelays))
 		healthResponse.Set("timestamp", json.NewJsonValue(time.Now().Unix()))
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(statusCode)
-
 		// Marshal to JSON
 		jsonData, err := json.MarshalIndent(healthResponse, "", "  ")
 		if err != nil {
@@ -351,6 +354,12 @@ func (r *Relay) Start() error {
 			return
 		}
 
+		if statusCode != http.StatusOK || status == "degraded" {
+			logging.Warn("Health endpoint returning status=%d reason=%s payload=%s", statusCode, statusReason, string(jsonData))
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(statusCode)
 		w.Write(jsonData)
 	})
 
