@@ -23,8 +23,8 @@ RUN CGO_ENABLED=0 go build -a -installsuffix cgo -ldflags="-w -s" -o broadcast-r
 # Final stage - minimal runtime image
 FROM alpine:latest
 
-# Install ca-certificates for HTTPS connections to relays
-RUN apk --no-cache add ca-certificates tzdata
+# Install runtime deps (TLS roots/timezone/curl for health checks)
+RUN apk --no-cache add ca-certificates tzdata curl
 
 # Create non-root user
 RUN addgroup -g 1000 relay && \
@@ -51,7 +51,7 @@ EXPOSE 3334
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:3334/stats || exit 1
+    CMD curl --fail-with-body -sS http://localhost:3334/health
 
 # Run the relay
 ENTRYPOINT ["./broadcast-relay"]
