@@ -56,6 +56,7 @@ ratelimit.New(ratelimit.Config{
     ProbationMultiplier:        1,              // optional; default 1
     RepeatOffenderMultiplier:   2,              // optional; default 2
     CloseReason:                "rate limited", // optional; this is the default
+    LogFilePath:                "/var/log/relay/rate-limit.jsonl", // optional JSONL audit log
     LogDebug: func(format string, args ...any) {
         log.Printf("[ratelimit] "+format, args...)
     },
@@ -78,6 +79,7 @@ Any bucket with `Tokens`, `Interval`, and `Max` all positive is **enabled**; zer
 | `ProbationMultiplier` | Probation length after a ban ends: `previousBan × ProbationMultiplier`. **`0` disables probation** (no window after a ban; escalation state clears when the ban ends). Omit or set explicitly (e.g. `1`) for the default behavior. |
 | `RepeatOffenderMultiplier` | Next ban after breaking probation: `previousBan × RepeatOffenderMultiplier` (then capped). **`0` disables escalation** (next ban is `BaseBanDuration`). Omit or set explicitly (e.g. `2`) for exponential bans. |
 | `CloseReason` | WebSocket close payload (policy violation). Empty string becomes `rate limited`. |
+| `LogFilePath` | Optional path to append JSONL audit entries for all rate-limit decisions (connection/event/filter rejects, forced closes, ban checks). Includes request metadata (headers/cookies) and event/filter payloads when available. |
 | `LogDebug` | Optional; called for debug-style messages (rejects, warnings, closes, bans). |
 | `OnPanic` | Optional; if closing the WebSocket panics, this receives the recovered value (library also recovers so your process keeps running). |
 

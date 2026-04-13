@@ -57,6 +57,8 @@ type Config struct {
 	RateLimitBanRepeatMultiplier float64
 	// RateLimitDisableDisconnect: if true, rate-limited event/filter requests are rejected without forced close or IP ban.
 	RateLimitDisableDisconnect bool
+	// RateLimitLogFile: optional JSONL file path for detailed rate-limit audit logs.
+	RateLimitLogFile string
 }
 
 func Load() *Config {
@@ -94,6 +96,7 @@ func Load() *Config {
 		RateLimitBanProbationMultiplier: getEnvFloat("RATE_LIMIT_BAN_PROBATION_MULTIPLIER", 1),
 		RateLimitBanRepeatMultiplier:    getEnvFloat("RATE_LIMIT_BAN_REPEAT_MULTIPLIER", 2),
 		RateLimitDisableDisconnect:      getEnvBool("RATE_LIMIT_DISABLE_DISCONNECT", false),
+		RateLimitLogFile:                strings.TrimSpace(getEnv("RATE_LIMIT_LOG_FILE", "")),
 	}
 
 	logging.DebugMethod("config", "Load", "Loaded configuration: SeedRelays=%d, MandatoryRelays=%d, TopN=%d, Port=%s, Workers=%d",

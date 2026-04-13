@@ -39,6 +39,8 @@ type Config struct {
 
 	// CloseReason is the WebSocket close payload (policy violation). Empty defaults to "rate limited".
 	CloseReason string
+	// LogFilePath enables structured JSONL audit logging for rate-limit decisions when non-empty.
+	LogFilePath string
 
 	// LogDebug is optional (e.g. connect to verbose logging).
 	LogDebug func(format string, args ...any)

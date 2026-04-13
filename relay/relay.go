@@ -109,6 +109,7 @@ func (r *Relay) setupRelay() {
 		MaxBanDuration:           r.config.RateLimitBanMaxDuration,
 		ProbationMultiplier:      r.config.RateLimitBanProbationMultiplier,
 		RepeatOffenderMultiplier: r.config.RateLimitBanRepeatMultiplier,
+		LogFilePath:              r.config.RateLimitLogFile,
 		LogDebug: func(format string, args ...any) {
 			logging.DebugMethod("relay", "rateLimit", format, args...)
 		},
