@@ -1,10 +1,11 @@
-# ratelimit — khatru rate limits, warnings, close, and IP ban
+# ratelimit — khatru rate limits, warnings, optional close, and optional IP ban
 
 This package wires [khatru](https://github.com/fiatjaf/khatru) `RejectConnection`, `RejectEvent`, and `RejectFilter` hooks so you get:
 
 - **Token-bucket limits** per client IP (connection upgrades, published events, REQ filters), using khatru’s built-in policy limiters.
 - **Progressive warnings**: the first *N* rate-limit rejects for a client still return a normal reject message, with an extra suffix explaining that the connection will close on the next hit.
 - **Forced WebSocket close** on the next rate-limit hit after those warnings (close reason is configurable, default `rate limited`).
+- **Optional soft-only mode**: disable forced close behavior so event/filter rejects always stay soft (no close, no ban state).
 - **Optional escalating IP ban**: after a forced close, that client IP cannot open **new** WebSocket upgrades for a configurable base duration. When the ban ends, the IP enters **probation** for `lastBanDuration × ProbationMultiplier` (default multiplier **1** = same length as the ban). If another forced close happens during probation, the next ban is `lastBanDuration × RepeatOffenderMultiplier` (default **2**), capped by `MaxBanDuration`. Completing probation without a violation resets escalation back to the base ban.
 
 Closing uses `WebSocket.WriteMessage` on the khatru connection (not a raw `*websocket.Conn`), which matches how khatru serializes writes.
@@ -48,7 +49,8 @@ ratelimit.New(ratelimit.Config{
         Interval: time.Minute,
         Max:      100,
     },
-    SoftRejectCount:  3, // optional; default 3 if ≤ 0
+    SoftRejectCount:      3,     // optional; default 3 if ≤ 0
+    DisableDisconnect:    false, // optional; when true all rejects stay soft and bans are disabled
     BaseBanDuration:            1 * time.Minute,
     MaxBanDuration:             24 * time.Hour, // optional; default 24h if ≤ 0 after normalize
     ProbationMultiplier:        1,              // optional; default 1
@@ -70,6 +72,7 @@ Any bucket with `Tokens`, `Interval`, and `Max` all positive is **enabled**; zer
 | `EventIP` | Limit published **events** per IP; shares strike counter with `FilterIP` for the same client. |
 | `FilterIP` | Limit **REQ** filters per IP; same strike counter as `EventIP` per client key. |
 | `SoftRejectCount` | Number of **soft** rate-limit responses (warning suffix only) before the **next** reject also closes the socket. Default `3` → strikes 1–3 warn, 4th closes. |
+| `DisableDisconnect` | Keep event/filter rejects soft-only. When `true`, sockets are never force-closed by this package and IP bans are disabled. |
 | `BaseBanDuration` | Length of the **first** ban after a forced close, and again after probation completes cleanly. `0` disables banning (strikes/close still apply if event/filter limits are enabled). |
 | `MaxBanDuration` | Upper bound for ban length when probation is broken (each break uses `min(previousBan × RepeatOffenderMultiplier, MaxBanDuration)`). Normalized default `24h` if unset or `≤ 0`. |
 | `ProbationMultiplier` | Probation length after a ban ends: `previousBan × ProbationMultiplier`. **`0` disables probation** (no window after a ban; escalation state clears when the ban ends). Omit or set explicitly (e.g. `1`) for the default behavior. |

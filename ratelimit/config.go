@@ -14,7 +14,7 @@ func (b Bucket) Enabled() bool {
 	return b.Tokens > 0 && b.Interval > 0 && b.Max > 0
 }
 
-// Config drives Apply on a khatru relay: connection / event / filter limits, soft rejects, post-close IP ban.
+// Config drives Apply on a khatru relay: connection / event / filter limits, soft rejects, optional close + ban.
 type Config struct {
 	Connection Bucket
 	EventIP    Bucket
@@ -23,6 +23,9 @@ type Config struct {
 	// SoftRejectCount is how many rate-limit rejects per client IP only add a warning suffix before the next
 	// reject also closes the WebSocket and may ban. Default 3 → strikes 1–3 soft, 4th closes.
 	SoftRejectCount int
+	// DisableDisconnect keeps rate-limit rejects soft only; no forced close and no IP ban state.
+	// Default false (legacy behavior: close+ban path remains enabled).
+	DisableDisconnect bool
 
 	// BaseBanDuration is the first ban length after a forced close (and again after a clean probation). Zero disables all banning.
 	BaseBanDuration time.Duration
@@ -46,6 +49,9 @@ type Config struct {
 func (c *Config) normalize() {
 	if c.SoftRejectCount <= 0 {
 		c.SoftRejectCount = 3
+	}
+	if c.DisableDisconnect {
+		c.BaseBanDuration = 0
 	}
 	if c.CloseReason == "" {
 		c.CloseReason = "rate limited"

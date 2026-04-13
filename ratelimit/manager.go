@@ -88,6 +88,10 @@ func (m *Manager) handleEventOrFilterReject(ctx context.Context, policyMsg, kind
 	strike, closeConn, strikeKey, ip, ws := m.strikeAfterReject(ctx)
 	wsTag := wsTag(ws)
 	soft := m.cfg.SoftRejectCount
+	if m.cfg.DisableDisconnect {
+		m.logf("rateLimit soft reject %d ws=%s key=%q IP=%s (%s): %s", strike, wsTag, strikeKey, ipLog(ip), kind, policyMsg)
+		return true, policyMsg
+	}
 	if closeConn {
 		m.logf("rateLimit closing ws=%s after %d strikes for key=%q IP=%s (%s): %s", wsTag, strike, strikeKey, ipLog(ip), kind, policyMsg)
 		m.forcedDisconnect(ctx, strikeKey, ip)

@@ -104,6 +104,7 @@ func (r *Relay) setupRelay() {
 		EventIP:                  rateLimitBucket(r.config.RateLimitEventIP),
 		FilterIP:                 rateLimitBucket(r.config.RateLimitFilterIP),
 		SoftRejectCount:          3,
+		DisableDisconnect:        r.config.RateLimitDisableDisconnect,
 		BaseBanDuration:          r.config.RateLimitBanBaseDuration,
 		MaxBanDuration:           r.config.RateLimitBanMaxDuration,
 		ProbationMultiplier:      r.config.RateLimitBanProbationMultiplier,

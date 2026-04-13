@@ -55,6 +55,8 @@ type Config struct {
 	RateLimitBanProbationMultiplier float64
 	// RateLimitBanRepeatMultiplier: next ban after breaking probation = last ban × this (default 2; 0 disables escalation).
 	RateLimitBanRepeatMultiplier float64
+	// RateLimitDisableDisconnect: if true, rate-limited event/filter requests are rejected without forced close or IP ban.
+	RateLimitDisableDisconnect bool
 }
 
 func Load() *Config {
@@ -91,6 +93,7 @@ func Load() *Config {
 		RateLimitBanMaxDuration:  getEnvDuration("RATE_LIMIT_BAN_MAX", 24*time.Hour),
 		RateLimitBanProbationMultiplier: getEnvFloat("RATE_LIMIT_BAN_PROBATION_MULTIPLIER", 1),
 		RateLimitBanRepeatMultiplier:    getEnvFloat("RATE_LIMIT_BAN_REPEAT_MULTIPLIER", 2),
+		RateLimitDisableDisconnect:      getEnvBool("RATE_LIMIT_DISABLE_DISCONNECT", false),
 	}
 
 	logging.DebugMethod("config", "Load", "Loaded configuration: SeedRelays=%d, MandatoryRelays=%d, TopN=%d, Port=%s, Workers=%d",
@@ -128,6 +131,18 @@ func getEnvDuration(key string, defaultValue time.Duration) time.Duration {
 	if value := os.Getenv(key); value != "" {
 		if duration, err := time.ParseDuration(value); err == nil {
 			return duration
+		}
+	}
+	return defaultValue
+}
+
+func getEnvBool(key string, defaultValue bool) bool {
+	if value := strings.TrimSpace(strings.ToLower(os.Getenv(key))); value != "" {
+		switch value {
+		case "1", "true", "yes", "on":
+			return true
+		case "0", "false", "no", "off":
+			return false
 		}
 	}
 	return defaultValue
