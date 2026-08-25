@@ -3,6 +3,7 @@ module github.com/girino/nostr-brodcast-relay
 go 1.25.3
 
 require (
+	github.com/fasthttp/websocket v1.5.12
 	github.com/fiatjaf/khatru v0.19.1
 	github.com/girino/nostr-lib v0.0.0-20251026200009-86cf6b513bb1
 	github.com/nbd-wtf/go-nostr v0.52.0
@@ -21,7 +22,6 @@ require (
 	github.com/coder/websocket v1.8.13 // indirect
 	github.com/decred/dcrd/crypto/blake256 v1.1.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
-	github.com/fasthttp/websocket v1.5.12 // indirect
 	github.com/fiatjaf/eventstore v0.17.2 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
@@ -41,6 +41,6 @@ require (
 	github.com/valyala/fasthttp v1.59.0 // indirect
 	golang.org/x/arch v0.16.0 // indirect
 	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394 // indirect
-	golang.org/x/net v0.37.0 // indirect
-	golang.org/x/sys v0.32.0 // indirect
+	golang.org/x/net v0.55.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
 )
