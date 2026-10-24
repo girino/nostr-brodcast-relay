@@ -5,7 +5,7 @@ go 1.25.3
 require (
 	github.com/fasthttp/websocket v1.5.12
 	github.com/fiatjaf/khatru v0.19.1
-	github.com/girino/nostr-lib v0.0.0-20251026200009-86cf6b513bb1
+	github.com/girino/nostr-lib v0.0.0-20261024025223-09f9b7cd80bb
 	github.com/nbd-wtf/go-nostr v0.52.0
 )
 
